@@ -64,14 +64,14 @@ with col1:
     for i, px in enumerate(posities_x):
         y_lim = l2 if (vorm_type == "Rechthoek / Balk" or px <= dikte) else dikte
         ax1.plot([px, px], [0, y_lim], color='red', linestyle='--', linewidth=1.5)
-        ax1.text(px, y_lim + (max(l1,l2)*0.02), f"X{i+1}:{int(px)}", color='red', fontsize=9, ha='center', weight='bold')
+        ax1.text(px, y_lim + (max(l1,l2)*0.03), f"X{i+1}:{int(px)}", color='red', fontsize=9, ha='center', weight='bold', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
             
     for i, py in enumerate(posities_y):
         x_lim = l1 if (vorm_type == "Rechthoek / Balk" or py <= dikte) else dikte
         ax1.plot([0, x_lim], [py, py], color='red', linestyle='--', linewidth=1.5)
-        ax1.text(x_lim + (max(l1,l2)*0.02), py, f"Y{i+1}:{int(py)}", color='red', fontsize=9, va='center', weight='bold')
+        ax1.text(x_lim + (max(l1,l2)*0.03), py, f"Y{i+1}:{int(py)}", color='red', fontsize=9, va='center', weight='bold', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
     
-    m = max(l1, l2) * 1.1
+    m = max(l1, l2) * 1.2
     ax1.set_xlim(-50, m); ax1.set_ylim(-50, m); ax1.set_aspect('equal'); ax1.grid(True, linestyle=':', alpha=0.3)
     st.pyplot(fig1)
 
@@ -87,37 +87,40 @@ with col2:
     vlakken = [[v_3d[i] for i in idx] for idx in vlak_indices]
     
     k = 'cyan' if vorm_type == "Rechthoek / Balk" else 'orange'
-    poly3d = Poly3DCollection(vlakken, facecolors=k, linewidths=1, edgecolors='blue', alpha=.2)
+    poly3d = Poly3DCollection(vlakken, facecolors=k, linewidths=1, edgecolors='blue', alpha=.15)
     ax2.add_collection3d(poly3d)
     
-    # Zaagsnedes in 3D (Roder en met labels)
+    # Zaagsnedes in 3D (Hoger geplaatste labels met achtergrond)
+    # De tekst staat nu op Hoogte + 15% van de totale hoogte
+    label_h_offset = h + (max(l1, l2, h) * 0.15)
+
     for i, px in enumerate(posities_x):
         y_top = l2 if (vorm_type == "Rechthoek / Balk" or px <= dikte) else dikte
         zs_vlak = np.array([[px, 0, 0], [px, y_top, 0], [px, y_top, h], [px, 0, h]])
-        ax2.add_collection3d(Poly3DCollection([zs_vlak], facecolors='red', alpha=0.8, edgecolors='darkred', linewidths=2))
-        ax2.text(px, y_top/2, h + 20, f"X{i+1}:{int(px)}", color='red', weight='bold')
+        ax2.add_collection3d(Poly3DCollection([zs_vlak], facecolors='red', alpha=0.9, edgecolors='darkred', linewidths=2))
+        ax2.text(px, y_top/2, label_h_offset, f"X{i+1}:{int(px)}", color='red', weight='bold', fontsize=10, bbox=dict(facecolor='white', alpha=0.8))
 
     for i, py in enumerate(posities_y):
         x_top = l1 if (vorm_type == "Rechthoek / Balk" or py <= dikte) else dikte
         zs_vlak = np.array([[0, py, 0], [x_top, py, 0], [x_top, py, h], [0, py, h]])
-        ax2.add_collection3d(Poly3DCollection([zs_vlak], facecolors='red', alpha=0.8, edgecolors='darkred', linewidths=2))
-        ax2.text(x_top/2, py, h + 20, f"Y{i+1}:{int(py)}", color='red', weight='bold')
+        ax2.add_collection3d(Poly3DCollection([zs_vlak], facecolors='red', alpha=0.9, edgecolors='darkred', linewidths=2))
+        ax2.text(x_top/2, py, label_h_offset, f"Y{i+1}:{int(py)}", color='red', weight='bold', fontsize=10, bbox=dict(facecolor='white', alpha=0.8))
 
     d = max(l1, l2, h)
     ax2.set_xlim(0, d); ax2.set_ylim(0, d); ax2.set_zlim(0, d)
     
-    # Verwijder de grijze achtergrondvlakken (blokje achtergrond)
+    # Schone achtergrond
     ax2.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax2.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax2.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-    ax2.grid(False) # Optioneel: zet ook de gridlijnen uit voor een nog schoner beeld
+    ax2.grid(False)
     
     ax2.set_xlabel('X (mm)'); ax2.set_ylabel('Y (mm)'); ax2.set_zlabel('H (mm)')
     st.pyplot(fig2)
 
 # --- OVERZICHT ---
 st.divider()
-st.subheader("📋 Overzicht (alle maten in mm)")
+st.subheader("📋 Overzicht (mm)")
 overzicht_data = {"Item": ["Lengte", "Breedte", "Hoogte", "Dikte"], "Waarde": [f"{int(l1)}", f"{int(l2)}", f"{int(h)}", f"{int(dikte) if dikte > 0 else 'N.v.t.'}"]}
 for i, px in enumerate(posities_x):
     overzicht_data["Item"].append(f"Zaagsnede X-{i+1}"); overzicht_data["Waarde"].append(f"{int(px)}")

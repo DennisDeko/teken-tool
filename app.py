@@ -1,60 +1,69 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import numpy as np
 
 st.set_page_config(page_title="Maten Tool Pro", layout="wide")
-st.title("📏 Exacte Maten Visualisatie (Schoon Model)")
+st.title("📐 3D Visualisatie met Schuine Hoeken")
 
-# Sidebar voor vrije invoer
-st.sidebar.header("Voer je maten in")
-l = st.sidebar.number_input("Lengte", min_value=0.1, value=100.0, step=0.1)
-b = st.sidebar.number_input("Breedte", min_value=0.1, value=50.0, step=0.1)
-h = st.sidebar.number_input("Hoogte (0 voor 2D)", min_value=0.0, value=20.0, step=0.1)
+# Sidebar
+st.sidebar.header("Basis Maten")
+l = st.sidebar.number_input("Lengte (onder)", min_value=0.1, value=100.0)
+b = st.sidebar.number_input("Breedte (onder)", min_value=0.1, value=50.0)
+h = st.sidebar.number_input("Hoogte", min_value=0.0, value=40.0)
 
-# Layout: twee kolommen voor de tekeningen
-col1, col2 = st.columns(2)
+st.sidebar.header("Hoek Instellingen (Offset)")
+off_x = st.sidebar.number_input("Verschuiving X (bovenkant)", value=20.0)
+off_y = st.sidebar.number_input("Verschuiving Y (bovenkant)", value=0.0)
 
-# --- Kolom 1: 2D Bovenaanzicht ---
-fig1, ax1 = plt.subplots()
-rechthoek = plt.Rectangle((0, 0), l, b, fill=None, edgecolor='blue', linewidth=2)
-ax1.add_patch(rechthoek)
-margin = max(l, b) * 0.1
-ax1.set_xlim(-margin, l + margin)
-ax1.set_ylim(-margin, b + margin)
-ax1.set_title(f"Bovenaanzicht: {l} x {b}")
-ax1.set_aspect('equal')
-col1.pyplot(fig1)
+# Berekening punten
+# Onderkant (0 hoogte)
+p0 = [0, 0, 0]
+p1 = [l, 0, 0]
+p2 = [l, b, 0]
+p3 = [0, b, 0]
 
-# --- Kolom 2: 3D Model ---
+# Bovenkant (met offset)
+p4 = [off_x, off_y, h]
+p5 = [l + off_x, off_y, h]
+p6 = [l + off_x, b + off_y, h]
+p7 = [off_x, b + off_y, h]
+
+v = np.array([p0, p1, p2, p3, p4, p5, p6, p7])
+
+# Vlakken definieren
+vlakken = [
+    [v[0], v[1], v[2], v[3]], # Onder
+    [v[4], v[5], v[6], v[7]], # Boven
+    [v[0], v[1], v[5], v[4]], # Voor
+    [v[2], v[3], v[7], v[6]], # Achter
+    [v[1], v[2], v[6], v[5]], # Rechts
+    [v[0], v[3], v[7], v[4]]  # Links
+]
+
+fig = plt.figure(figsize=(10, 7))
+ax = fig.add_subplot(111, projection='3d')
+
+# Teken de vorm
+poly = Poly3DCollection(vlakken, facecolors='cyan', linewidths=1, edgecolors='blue', alpha=.20)
+ax.add_collection3d(poly)
+
+# Schaling en assen
+all_points = v
+max_val = np.max(all_points)
+min_val = np.min(all_points)
+
+ax.set_xlim(min_val, max_val)
+ax.set_ylim(min_val, max_val)
+ax.set_zlim(0, max_val)
+
+# Grid verwijderen
+ax.grid(False)
+ax.xaxis.pane.fill = ax.yaxis.pane.fill = ax.zaxis.pane.fill = False
+
+st.pyplot(fig)
+
+# Bereken de hoek in graden voor de gebruiker
 if h > 0:
-    fig2 = plt.figure()
-    ax2 = fig2.add_subplot(111, projection='3d')
-    
-    # Hoekpunten
-    v = [[0, 0, 0], [l, 0, 0], [l, b, 0], [0, b, 0],
-         [0, 0, h], [l, 0, h], [l, b, h], [0, b, h]]
-    
-    # Vlakken
-    vlakken = [[v[0], v[1], v[5], v[4]], [v[7], v[6], v[2], v[3]],
-                [v[0], v[3], v[7], v[4]], [v[1], v[2], v[6], v[5]],
-                [v[0], v[1], v[2], v[3]], [v[4], v[5], v[6], v[7]]]
-    
-    ax2.add_collection3d(Poly3DCollection(vlakken, facecolors='cyan', linewidths=1, edgecolors='blue', alpha=.15))
-    
-    # Zorg dat de assen gelijkmatig schalen
-    max_dim = max(l, b, h)
-    ax2.set_xlim(0, max_dim)
-    ax2.set_ylim(0, max_dim)
-    ax2.set_zlim(0, max_dim)
-    ax2.set_title(f"3D Model: {h} hoog")
-    
-    # --- DIT VERWIJDERT DE BLOKJESACHTERGROND ---
-    ax2.grid(False) # Schakelt het grid zelf uit
-    ax2.xaxis.pane.fill = False # Maakt het X-vlak transparant
-    ax2.yaxis.pane.fill = False # Maakt het Y-vlak transparant
-    ax2.zaxis.pane.fill = False # Maakt het Z-vlak transparant
-    # ---------------------------------------------
-    
-    col2.pyplot(fig2)
-else:
-    col2.write("Voer een hoogte in voor de 3D weergave.")
+    hoek_x = np.degrees(np.arctan(off_x / h))
+    st.info(f"De hoek van de zijwand t.o.v. verticaal is ongeveer **{abs(hoek_x):.1f}°**")

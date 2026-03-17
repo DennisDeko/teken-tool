@@ -2,8 +2,8 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-st.set_page_config(page_title="Maten Tool", layout="wide")
-st.title("📏 Exacte Maten Visualisatie")
+st.set_page_config(page_title="Maten Tool Pro", layout="wide")
+st.title("📏 Exacte Maten Visualisatie (Schoon Model)")
 
 # Sidebar voor vrije invoer
 st.sidebar.header("Voer je maten in")
@@ -14,6 +14,7 @@ h = st.sidebar.number_input("Hoogte (0 voor 2D)", min_value=0.0, value=20.0, ste
 # Layout: twee kolommen voor de tekeningen
 col1, col2 = st.columns(2)
 
+# --- Kolom 1: 2D Bovenaanzicht ---
 fig1, ax1 = plt.subplots()
 rechthoek = plt.Rectangle((0, 0), l, b, fill=None, edgecolor='blue', linewidth=2)
 ax1.add_patch(rechthoek)
@@ -24,6 +25,7 @@ ax1.set_title(f"Bovenaanzicht: {l} x {b}")
 ax1.set_aspect('equal')
 col1.pyplot(fig1)
 
+# --- Kolom 2: 3D Model ---
 if h > 0:
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(111, projection='3d')
@@ -37,7 +39,7 @@ if h > 0:
                 [v[0], v[3], v[7], v[4]], [v[1], v[2], v[6], v[5]],
                 [v[0], v[1], v[2], v[3]], [v[4], v[5], v[6], v[7]]]
     
-    ax2.add_collection3d(Poly3DCollection(vlakken, facecolors='cyan', linewidths=1, edgecolors='blue', alpha=.25))
+    ax2.add_collection3d(Poly3DCollection(vlakken, facecolors='cyan', linewidths=1, edgecolors='blue', alpha=.15))
     
     # Zorg dat de assen gelijkmatig schalen
     max_dim = max(l, b, h)
@@ -45,6 +47,14 @@ if h > 0:
     ax2.set_ylim(0, max_dim)
     ax2.set_zlim(0, max_dim)
     ax2.set_title(f"3D Model: {h} hoog")
+    
+    # --- DIT VERWIJDERT DE BLOKJESACHTERGROND ---
+    ax2.grid(False) # Schakelt het grid zelf uit
+    ax2.xaxis.pane.fill = False # Maakt het X-vlak transparant
+    ax2.yaxis.pane.fill = False # Maakt het Y-vlak transparant
+    ax2.zaxis.pane.fill = False # Maakt het Z-vlak transparant
+    # ---------------------------------------------
+    
     col2.pyplot(fig2)
 else:
     col2.write("Voer een hoogte in voor de 3D weergave.")

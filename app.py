@@ -13,7 +13,7 @@ col_logo, col_titel = st.columns([1, 3])
 with col_logo:
     st.image(LOGO_URL, use_container_width=True)
 with col_titel:
-    st.title("Universele Maten Tool Pro")
+    st.title("Universele Maten Tool Pro (mm)")
 
 st.divider()
 
@@ -21,34 +21,34 @@ st.divider()
 vorm_type = st.sidebar.selectbox("Kies een vorm", ["Rechthoek / Balk", "L-Vorm"])
 
 st.sidebar.subheader("Zaagsnede Instellingen")
-aantal_x = st.sidebar.slider("Aantal Zaagsnedes X (Verticaal)", 0, 5, 0)
-aantal_y = st.sidebar.slider("Aantal Zaagsnedes Y (Horizontaal)", 0, 5, 0)
+aantal_x = st.sidebar.slider("Aantal Zaagsnedes X (Verticaal)", 0, 10, 0)
+aantal_y = st.sidebar.slider("Aantal Zaagsnedes Y (Horizontaal)", 0, 10, 0)
 
 posities_x = []
 for i in range(aantal_x):
-    pos = st.sidebar.number_input(f"Positie X-{i+1} (cm)", value=10.0 + (i*20.0), key=f"x_{i}")
+    pos = st.sidebar.number_input(f"Positie X-{i+1} (mm)", value=100.0 + (i*100.0), key=f"x_{i}")
     posities_x.append(pos)
 
 posities_y = []
 for i in range(aantal_y):
-    pos = st.sidebar.number_input(f"Positie Y-{i+1} (cm)", value=10.0 + (i*20.0), key=f"y_{i}")
+    pos = st.sidebar.number_input(f"Positie Y-{i+1} (mm)", value=100.0 + (i*100.0), key=f"y_{i}")
     posities_y.append(pos)
 
 st.sidebar.divider()
 
 if vorm_type == "Rechthoek / Balk":
-    l1 = st.sidebar.number_input("Lengte (cm)", min_value=1.0, value=100.0)
-    l2 = st.sidebar.number_input("Breedte (cm)", min_value=1.0, value=50.0)
-    h = st.sidebar.number_input("Hoogte (cm)", min_value=0.1, value=40.0)
+    l1 = st.sidebar.number_input("Lengte (mm)", min_value=1.0, value=1000.0)
+    l2 = st.sidebar.number_input("Breedte (mm)", min_value=1.0, value=500.0)
+    h = st.sidebar.number_input("Hoogte (mm)", min_value=0.1, value=400.0)
     dikte = 0.0
     grond_poly = np.array([[0,0], [l1,0], [l1,l2], [0,l2]])
     vlak_indices = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
 else:
-    l1 = st.sidebar.number_input("Lengte Zijde 1 (cm)", min_value=1.0, value=100.0)
-    l2 = st.sidebar.number_input("Lengte Zijde 2 (cm)", min_value=1.0, value=60.0)
+    l1 = st.sidebar.number_input("Lengte Zijde 1 (mm)", min_value=1.0, value=1000.0)
+    l2 = st.sidebar.number_input("Lengte Zijde 2 (mm)", min_value=1.0, value=600.0)
     limiet = float(min(l1, l2))
-    dikte = st.sidebar.number_input("Dikte (cm)", min_value=0.1, max_value=limiet, value=20.0)
-    h = st.sidebar.number_input("Hoogte (cm)", min_value=0.1, value=30.0)
+    dikte = st.sidebar.number_input("Dikte (mm)", min_value=0.1, max_value=limiet, value=200.0)
+    h = st.sidebar.number_input("Hoogte (mm)", min_value=0.1, value=300.0)
     grond_poly = np.array([[0,0], [l1,0], [l1,dikte], [dikte,dikte], [dikte,l2], [0,l2]])
     vlak_indices = [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11], [0, 1, 7, 6], [1, 2, 8, 7], [2, 3, 9, 8], [3, 4, 10, 9], [4, 5, 11, 10], [5, 0, 6, 11]]
 
@@ -56,29 +56,27 @@ else:
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("2D Bovenaanzicht")
+    st.subheader("2D Bovenaanzicht (mm)")
     fig1, ax1 = plt.subplots()
     omtrek = plt.Polygon(grond_poly, fill=None, edgecolor='blue', linewidth=2)
     ax1.add_patch(omtrek)
     
-    # X-Zaagsnedes met labels
     for i, px in enumerate(posities_x):
         y_lim = l2 if (vorm_type == "Rechthoek / Balk" or px <= dikte) else dikte
-        ax1.plot([px, px], [0, y_lim], color='red', linestyle='--', linewidth=1.2)
-        ax1.text(px, y_lim + 1, f"X{i+1}:{px}", color='red', fontsize=8, ha='center')
+        ax1.plot([px, px], [0, y_lim], color='red', linestyle='--', linewidth=1.5)
+        ax1.text(px, y_lim + (max(l1,l2)*0.02), f"X{i+1}:{int(px)}", color='red', fontsize=9, ha='center', weight='bold')
             
-    # Y-Zaagsnedes met labels
     for i, py in enumerate(posities_y):
         x_lim = l1 if (vorm_type == "Rechthoek / Balk" or py <= dikte) else dikte
-        ax1.plot([0, x_lim], [py, py], color='red', linestyle='--', linewidth=1.2)
-        ax1.text(x_lim + 1, py, f"Y{i+1}:{py}", color='red', fontsize=8, va='center')
+        ax1.plot([0, x_lim], [py, py], color='red', linestyle='--', linewidth=1.5)
+        ax1.text(x_lim + (max(l1,l2)*0.02), py, f"Y{i+1}:{int(py)}", color='red', fontsize=9, va='center', weight='bold')
     
-    m = max(l1, l2) + 10
-    ax1.set_xlim(-5, m); ax1.set_ylim(-5, m); ax1.set_aspect('equal'); ax1.grid(True, linestyle=':', alpha=0.3)
+    m = max(l1, l2) * 1.1
+    ax1.set_xlim(-50, m); ax1.set_ylim(-50, m); ax1.set_aspect('equal'); ax1.grid(True, linestyle=':', alpha=0.3)
     st.pyplot(fig1)
 
 with col2:
-    st.subheader("3D Model")
+    st.subheader("3D Model (mm)")
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(111, projection='3d')
     
@@ -89,34 +87,41 @@ with col2:
     vlakken = [[v_3d[i] for i in idx] for idx in vlak_indices]
     
     k = 'cyan' if vorm_type == "Rechthoek / Balk" else 'orange'
-    poly3d = Poly3DCollection(vlakken, facecolors=k, linewidths=1, edgecolors='blue', alpha=.3)
+    poly3d = Poly3DCollection(vlakken, facecolors=k, linewidths=1, edgecolors='blue', alpha=.2)
     ax2.add_collection3d(poly3d)
     
-    # Zaagsnedes in 3D tekenen
-    for px in posities_x:
+    # Zaagsnedes in 3D (Roder en met labels)
+    for i, px in enumerate(posities_x):
         y_top = l2 if (vorm_type == "Rechthoek / Balk" or px <= dikte) else dikte
-        # Teken een verticaal rood vlak op de X positie
         zs_vlak = np.array([[px, 0, 0], [px, y_top, 0], [px, y_top, h], [px, 0, h]])
-        ax2.add_collection3d(Poly3DCollection([zs_vlak], facecolors='red', alpha=0.5, edgecolors='red', linestyle='--'))
+        ax2.add_collection3d(Poly3DCollection([zs_vlak], facecolors='red', alpha=0.8, edgecolors='darkred', linewidths=2))
+        ax2.text(px, y_top/2, h + 20, f"X{i+1}:{int(px)}", color='red', weight='bold')
 
-    for py in posities_y:
+    for i, py in enumerate(posities_y):
         x_top = l1 if (vorm_type == "Rechthoek / Balk" or py <= dikte) else dikte
-        # Teken een horizontaal rood vlak op de Y positie
         zs_vlak = np.array([[0, py, 0], [x_top, py, 0], [x_top, py, h], [0, py, h]])
-        ax2.add_collection3d(Poly3DCollection([zs_vlak], facecolors='red', alpha=0.5, edgecolors='red', linestyle='--'))
+        ax2.add_collection3d(Poly3DCollection([zs_vlak], facecolors='red', alpha=0.8, edgecolors='darkred', linewidths=2))
+        ax2.text(x_top/2, py, h + 20, f"Y{i+1}:{int(py)}", color='red', weight='bold')
 
     d = max(l1, l2, h)
     ax2.set_xlim(0, d); ax2.set_ylim(0, d); ax2.set_zlim(0, d)
-    ax2.set_xlabel('X (cm)'); ax2.set_ylabel('Y (cm)'); ax2.set_zlabel('H (cm)')
+    
+    # Verwijder de grijze achtergrondvlakken (blokje achtergrond)
+    ax2.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax2.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax2.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax2.grid(False) # Optioneel: zet ook de gridlijnen uit voor een nog schoner beeld
+    
+    ax2.set_xlabel('X (mm)'); ax2.set_ylabel('Y (mm)'); ax2.set_zlabel('H (mm)')
     st.pyplot(fig2)
 
 # --- OVERZICHT ---
 st.divider()
-st.subheader("📋 Overzicht")
-overzicht_data = {"Item": ["Lengte", "Breedte", "Hoogte", "Dikte"], "Waarde": [f"{l1}", f"{l2}", f"{h}", f"{dikte if dikte > 0 else 'N.v.t.'}"]}
+st.subheader("📋 Overzicht (alle maten in mm)")
+overzicht_data = {"Item": ["Lengte", "Breedte", "Hoogte", "Dikte"], "Waarde": [f"{int(l1)}", f"{int(l2)}", f"{int(h)}", f"{int(dikte) if dikte > 0 else 'N.v.t.'}"]}
 for i, px in enumerate(posities_x):
-    overzicht_data["Item"].append(f"Zaagsnede X-{i+1}"); overzicht_data["Waarde"].append(f"{px}")
+    overzicht_data["Item"].append(f"Zaagsnede X-{i+1}"); overzicht_data["Waarde"].append(f"{int(px)}")
 for i, py in enumerate(posities_y):
-    overzicht_data["Item"].append(f"Zaagsnede Y-{i+1}"); overzicht_data["Waarde"].append(f"{py}")
+    overzicht_data["Item"].append(f"Zaagsnede Y-{i+1}"); overzicht_data["Waarde"].append(f"{int(py)}")
 
 st.table(pd.DataFrame(overzicht_data))

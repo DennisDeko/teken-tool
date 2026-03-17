@@ -20,17 +20,14 @@ if vorm_type == "Rechthoek / Balk":
     dikte = 0.0
     grond_poly = np.array([[0,0], [l1,0], [l1,l2], [0,l2]])
     vlak_indices = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
-    oppervlakte = l1 * l2
 else:
     l1 = st.sidebar.number_input("Lengte Zijde 1 (cm)", min_value=1.0, value=100.0)
     l2 = st.sidebar.number_input("Lengte Zijde 2 (cm)", min_value=1.0, value=60.0)
-    # Bereken max dikte vooraf om SyntaxErrors te voorkomen
     limiet = float(min(l1, l2))
     dikte = st.sidebar.number_input("Dikte (cm)", min_value=0.1, max_value=limiet, value=20.0)
     h = st.sidebar.number_input("Hoogte (cm)", min_value=0.1, value=30.0)
     grond_poly = np.array([[0,0], [l1,0], [l1,dikte], [dikte,dikte], [dikte,l2], [0,l2]])
     vlak_indices = [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11], [0, 1, 7, 6], [1, 2, 8, 7], [2, 3, 9, 8], [3, 4, 10, 9], [4, 5, 11, 10], [5, 0, 6, 11]]
-    oppervlakte = (l1 * dikte) + ((l2 - dikte) * dikte)
 
 # --- Visualisatie ---
 col1, col2 = st.columns(2)
@@ -61,22 +58,13 @@ with col2:
     ax2.grid(False); ax2.xaxis.pane.fill = ax2.yaxis.pane.fill = ax2.zaxis.pane.fill = False
     st.pyplot(fig2)
 
-# --- Maten Overzicht Onderaan ---
+# --- Alleen maten overzicht ---
 st.divider()
-st.subheader("📋 Overzicht Maten")
+st.subheader("📋 Ingevoerde Maten")
 
 data = {
     "Omschrijving": ["Lengte / Zijde 1", "Breedte / Zijde 2", "Hoogte", "Materiaaldikte"],
     "Maat (cm)": [f"{l1} cm", f"{l2} cm", f"{h} cm", f"{dikte} cm" if dikte > 0 else "N.v.t."]
 }
 df = pd.DataFrame(data)
-
-c1, c2, c3 = st.columns(3)
-with c1:
-    st.table(df)
-with c2:
-    st.metric("Grondoppervlak", f"{oppervlakte:.1f} cm²")
-with c3:
-    st.metric("Totaal Volume", f"{oppervlakte * h:.1f} cm³")
-
-st.info("Tip: Gebruik de zijbalk om tussen Rechthoek en L-Vorm te schakelen.")
+st.table(df)

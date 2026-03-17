@@ -17,40 +17,45 @@ with col_titel:
 
 st.divider()
 
-# --- INPUT SECTIE ---
+# --- SIDEBAR INSTELLINGEN ---
+
+# 1. Type vorm bovenaan
 vorm_type = st.sidebar.selectbox("Kies een vorm", ["Rechthoek / Balk", "L-Vorm"])
-
-st.sidebar.subheader("Zaagsnede Instellingen")
-aantal_x = st.sidebar.slider("Aantal Zaagsnedes X (Verticaal)", 0, 10, 0)
-aantal_y = st.sidebar.slider("Aantal Zaagsnedes Y (Horizontaal)", 0, 10, 0)
-
-posities_x = []
-for i in range(aantal_x):
-    pos = st.sidebar.number_input(f"Positie X-{i+1} (mm)", value=100.0 + (i*100.0), key=f"x_{i}")
-    posities_x.append(pos)
-
-posities_y = []
-for i in range(aantal_y):
-    pos = st.sidebar.number_input(f"Positie Y-{i+1} (mm)", value=100.0 + (i*100.0), key=f"y_{i}")
-    posities_y.append(pos)
-
 st.sidebar.divider()
 
-if vorm_type == "Rechthoek / Balk":
-    l1 = st.sidebar.number_input("Lengte (mm)", min_value=1.0, value=1000.0)
-    l2 = st.sidebar.number_input("Breedte (mm)", min_value=1.0, value=500.0)
-    h = st.sidebar.number_input("Hoogte (mm)", min_value=0.1, value=400.0)
-    dikte = 0.0
-    grond_poly = np.array([[0,0], [l1,0], [l1,l2], [0,l2]])
-    vlak_indices = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
-else:
-    l1 = st.sidebar.number_input("Lengte Zijde 1 (mm)", min_value=1.0, value=1000.0)
-    l2 = st.sidebar.number_input("Lengte Zijde 2 (mm)", min_value=1.0, value=600.0)
-    limiet = float(min(l1, l2))
-    dikte = st.sidebar.number_input("Dikte (mm)", min_value=0.1, max_value=limiet, value=200.0)
-    h = st.sidebar.number_input("Hoogte (mm)", min_value=0.1, value=300.0)
-    grond_poly = np.array([[0,0], [l1,0], [l1,dikte], [dikte,dikte], [dikte,l2], [0,l2]])
-    vlak_indices = [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11], [0, 1, 7, 6], [1, 2, 8, 7], [2, 3, 9, 8], [3, 4, 10, 9], [4, 5, 11, 10], [5, 0, 6, 11]]
+# 2. Maat Steen (Uitklapbaar)
+with st.sidebar.expander("Maat Steen", expanded=True):
+    if vorm_type == "Rechthoek / Balk":
+        l1 = st.number_input("Lengte (mm)", min_value=1.0, value=1000.0)
+        l2 = st.number_input("Breedte (mm)", min_value=1.0, value=500.0)
+        h = st.number_input("Hoogte (mm)", min_value=0.1, value=400.0)
+        dikte = 0.0
+        grond_poly = np.array([[0,0], [l1,0], [l1,l2], [0,l2]])
+        vlak_indices = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
+    else:
+        l1 = st.number_input("Lengte Zijde 1 (mm)", min_value=1.0, value=1000.0)
+        l2 = st.number_input("Lengte Zijde 2 (mm)", min_value=1.0, value=600.0)
+        limiet = float(min(l1, l2))
+        dikte = st.number_input("Dikte (mm)", min_value=0.1, max_value=limiet, value=200.0)
+        h = st.number_input("Hoogte (mm)", min_value=0.1, value=300.0)
+        grond_poly = np.array([[0,0], [l1,0], [l1,dikte], [dikte,dikte], [dikte,l2], [0,l2]])
+        vlak_indices = [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11], [0, 1, 7, 6], [1, 2, 8, 7], [2, 3, 9, 8], [3, 4, 10, 9], [4, 5, 11, 10], [5, 0, 6, 11]]
+
+# 3. Zaagsnede (Uitklapbaar)
+with st.sidebar.expander("Zaagsnede Instellingen", expanded=False):
+    aantal_x = st.slider("Aantal Zaagsnedes X (Verticaal)", 0, 10, 0)
+    posities_x = []
+    for i in range(aantal_x):
+        pos = st.number_input(f"Positie X-{i+1} (mm)", value=100.0 + (i*100.0), key=f"x_{i}")
+        posities_x.append(pos)
+
+    st.divider()
+    
+    aantal_y = st.slider("Aantal Zaagsnedes Y (Horizontaal)", 0, 10, 0)
+    posities_y = []
+    for i in range(aantal_y):
+        pos = st.number_input(f"Positie Y-{i+1} (mm)", value=100.0 + (i*100.0), key=f"y_{i}")
+        posities_y.append(pos)
 
 # --- VISUALISATIE ---
 col1, col2 = st.columns(2)
@@ -90,8 +95,6 @@ with col2:
     poly3d = Poly3DCollection(vlakken, facecolors=k, linewidths=1, edgecolors='blue', alpha=.15)
     ax2.add_collection3d(poly3d)
     
-    # Zaagsnedes in 3D (Hoger geplaatste labels met achtergrond)
-    # De tekst staat nu op Hoogte + 15% van de totale hoogte
     label_h_offset = h + (max(l1, l2, h) * 0.15)
 
     for i, px in enumerate(posities_x):
@@ -108,13 +111,10 @@ with col2:
 
     d = max(l1, l2, h)
     ax2.set_xlim(0, d); ax2.set_ylim(0, d); ax2.set_zlim(0, d)
-    
-    # Schone achtergrond
     ax2.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax2.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax2.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax2.grid(False)
-    
     ax2.set_xlabel('X (mm)'); ax2.set_ylabel('Y (mm)'); ax2.set_zlabel('H (mm)')
     st.pyplot(fig2)
 

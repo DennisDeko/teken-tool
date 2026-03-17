@@ -44,7 +44,8 @@ with col1:
     fig1, ax1 = plt.subplots()
     omtrek = plt.Polygon(grond_poly, fill=None, edgecolor='blue', linewidth=2)
     ax1.add_patch(omtrek)
-    ax1.set_xlim(-5, l1 + 5)
-    ax1.set_ylim(-5, max(l2, l1) + 5)
-    ax1.set_aspect('equal')
-    ax1.grid(True,
+    
+    # Gebruik de maximale maat voor een mooie schaal
+    max_l = max(l1, l2)
+    ax1.set_xlim(-5, max_l + 5)
+    ax1.set_ylim(-5, max_

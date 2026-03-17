@@ -4,8 +4,31 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 import pandas as pd
 
-st.set_page_config(page_title="Maten Tool Pro", layout="wide")
-st.title("📏 Universele Maten Tool")
+st.set_page_config(page_title="DEKO Maten Tool Pro", layout="wide")
+
+# --- HIER VERVANGEN WE HET ICOON VOOR HET LOGO ---
+# PAS DIT AAN: Plak hier de 'Raw' URL van je afbeelding op GitHub
+LOGO_URL = "https://raw.githubusercontent.com/JOUW_GEBRUIKERSNAAM/mijn-maten-tool/main/deko-logo.png"
+
+# Maak twee kolommen voor de kop: één voor het logo, één voor de tekst
+col_logo, col_titel = st.columns([1, 4]) # Het logo krijgt 1/5 van de breedte
+
+with col_logo:
+    # We laden het logo. 'use_column_width=True' zorgt dat het mooi schaalt.
+    try:
+        st.image(LOGO_URL, use_column_width=True)
+    except:
+        # Als de URL niet werkt, laten we toch het liniaaltje zien als backup
+        st.error("Logo kon niet worden geladen. Controleer de URL.")
+        st.title("📏")
+
+with col_titel:
+    # De titel komt in de kolom ernaast
+    st.title("Universele Maten Tool Pro")
+
+st.divider()
+
+# --- De rest van de code blijft hetzelfde ---
 
 # 1. Kies het type vorm
 vorm_type = st.sidebar.selectbox("Kies een vorm", ["Rechthoek / Balk", "L-Vorm"])

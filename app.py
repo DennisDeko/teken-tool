@@ -7,7 +7,6 @@ import pandas as pd
 st.set_page_config(page_title="DEKO Maten Tool Pro", layout="wide")
 
 # --- LOGO EN TITEL ---
-# Tip: Controleer of dit de juiste URL is die je eerder hebt gevonden
 LOGO_URL = "https://raw.githubusercontent.com/DennisDeko/teken-tool/main/deko_logo.jpg"
 
 col_logo, col_titel = st.columns([1, 3])
@@ -21,18 +20,20 @@ st.divider()
 # --- INPUT SECTIE ---
 vorm_type = st.sidebar.selectbox("Kies een vorm", ["Rechthoek / Balk", "L-Vorm"])
 
-# TEST OPTIE: Snijlijnen aan/uit
-st.sidebar.subheader("Test Instellingen")
+# SNIJLIJN INSTELLINGEN
+st.sidebar.subheader("Snijlijn Instellingen")
 toon_snijlijnen = st.sidebar.checkbox("Toon gestippelde snijlijnen", value=True)
-
-st.sidebar.divider()
 
 if vorm_type == "Rechthoek / Balk":
     l1 = st.sidebar.number_input("Lengte (cm)", min_value=1.0, value=100.0)
     l2 = st.sidebar.number_input("Breedte (cm)", min_value=1.0, value=50.0)
     h = st.sidebar.number_input("Hoogte (cm)", min_value=0.1, value=40.0)
     dikte = 0.0
-    # Punten: [x, y]
+    
+    # Velden voor snijlijn positie bij rechthoek
+    snij_x = st.sidebar.number_input("Snijlijn X (afstand vanaf links)", value=l1/2)
+    snij_y = st.sidebar.number_input("Snijlijn Y (afstand vanaf onder)", value=l2/2)
+    
     grond_poly = np.array([[0,0], [l1,0], [l1,l2], [0,l2]])
     vlak_indices = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
 else:
@@ -41,7 +42,11 @@ else:
     limiet = float(min(l1, l2))
     dikte = st.sidebar.number_input("Dikte (cm)", min_value=0.1, max_value=limiet, value=20.0)
     h = st.sidebar.number_input("Hoogte (cm)", min_value=0.1, value=30.0)
-    # Punten voor L-Vorm
+    
+    # Velden voor snijlijn positie bij L-vorm (standaard op de binnenhoek)
+    snij_x = st.sidebar.number_input("Snijlijn Verticaal (X)", value=float(dikte))
+    snij_y = st.sidebar.number_input("Snijlijn Horizontaal (Y)", value=float(dikte))
+    
     grond_poly = np.array([[0,0], [l1,0], [l1,dikte], [dikte,dikte], [dikte,l2], [0,l2]])
     vlak_indices = [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11], [0, 1, 7, 6], [1, 2, 8, 7], [2, 3, 9, 8], [3, 4, 10, 9], [4, 5, 11, 10], [5, 0, 6, 11]]
 
@@ -51,16 +56,19 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("2D Bovenaanzicht")
     fig1, ax1 = plt.subplots()
-    
-    # Teken de omtrek
     omtrek = plt.Polygon(grond_poly, fill=None, edgecolor='blue', linewidth=2)
     ax1.add_patch(omtrek)
     
-    # TEST: Teken snijlijnen alleen als vinkje aan staat
-    if toon_snijlijnen and vorm_type == "L-Vorm":
-        # We tekenen de lijnen die de interne 'dikte' markeren
-        ax1.plot([dikte, dikte], [0, dikte], color='red', linestyle='--', linewidth=1.2)
-        ax1.plot([0, dikte], [dikte, dikte], color='red', linestyle='--', linewidth=1.2)
+    # Teken de snijlijnen op basis van de invulvelden
+    if toon_snijlijnen:
+        if vorm_type == "Rechthoek / Balk":
+            # Teken kruisende lijnen voor een balk
+            ax1.axvline(x=snij_x, color='red', linestyle='--', linewidth=1)
+            ax1.axhline(y=snij_y, color='red', linestyle='--', linewidth=1)
+        else:
+            # Teken de lijnen binnen de L-vorm
+            ax1.plot([snij_x, snij_x], [0, dikte], color='red', linestyle='--', linewidth=1.5)
+            ax1.plot([0, dikte], [snij_y, snij_y], color='red', linestyle='--', linewidth=1.5)
     
     m = max(l1, l2) + 5
     ax1.set_xlim(-5, m); ax1.set_ylim(-5, m); ax1.set_aspect('equal'); ax1.grid(True, linestyle=':', alpha=0.3)
@@ -78,7 +86,6 @@ with col2:
     k = 'cyan' if vorm_type == "Rechthoek / Balk" else 'orange'
     poly3d = Poly3DCollection(vlakken, facecolors=k, linewidths=1, edgecolors='blue', alpha=.4)
     ax2.add_collection3d(poly3d)
-    
     d = max(l1, l2, h)
     ax2.set_xlim(0, d); ax2.set_ylim(0, d); ax2.set_zlim(0, d)
     ax2.grid(False); ax2.xaxis.pane.fill = ax2.yaxis.pane.fill = ax2.zaxis.pane.fill = False
@@ -87,8 +94,9 @@ with col2:
 # --- OVERZICHT ---
 st.divider()
 st.subheader("📋 Overzicht")
+# Voeg de snijlijn posities toe aan de tabel
 data = {
-    "Omschrijving": ["Lengte / Zijde 1", "Breedte / Zijde 2", "Hoogte", "Materiaaldikte"],
-    "Maat (cm)": [f"{l1} cm", f"{l2} cm", f"{h} cm", f"{dikte} cm" if dikte > 0 else "N.v.t."]
+    "Omschrijving": ["Lengte / Zijde 1", "Breedte / Zijde 2", "Hoogte", "Materiaaldikte", "Snijlijn X", "Snijlijn Y"],
+    "Maat (cm)": [f"{l1} cm", f"{l2} cm", f"{h} cm", f"{dikte} cm" if dikte > 0 else "N.v.t.", f"{snij_x} cm", f"{snij_y} cm"]
 }
 st.table(pd.DataFrame(data))

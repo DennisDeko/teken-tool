@@ -22,17 +22,17 @@ vorm_type = st.sidebar.selectbox("Kies een vorm", ["Rechthoek / Balk", "L-Vorm"]
 
 # ZAAGSNEDE INSTELLINGEN (DYNAMISCH)
 st.sidebar.subheader("Zaagsnede Instellingen")
-aantal_x = st.sidebar.slider("Aantal Zaagsnedes X (Verticaal)", 0, 5, 1)
-aantal_y = st.sidebar.slider("Aantal Zaagsnedes Y (Horizontaal)", 0, 5, 1)
+aantal_x = st.sidebar.slider("Aantal Zaagsnedes X (Verticaal)", 0, 5, 0)
+aantal_y = st.sidebar.slider("Aantal Zaagsnedes Y (Horizontaal)", 0, 5, 0)
 
 posities_x = []
 for i in range(aantal_x):
-    pos = st.sidebar.number_input(f"Positie X-{i+1} (cm)", value=10.0 + (i*10), key=f"x_{i}")
+    pos = st.sidebar.number_input(f"Positie X-{i+1} (cm)", value=10.0 + (i*10.0), key=f"x_{i}")
     posities_x.append(pos)
 
 posities_y = []
 for i in range(aantal_y):
-    pos = st.sidebar.number_input(f"Positie Y-{i+1} (cm)", value=10.0 + (i*10), key=f"y_{i}")
+    pos = st.sidebar.number_input(f"Positie Y-{i+1} (cm)", value=10.0 + (i*10.0), key=f"y_{i}")
     posities_y.append(pos)
 
 st.sidebar.divider()
@@ -63,16 +63,13 @@ with col1:
     omtrek = plt.Polygon(grond_poly, fill=None, edgecolor='blue', linewidth=2)
     ax1.add_patch(omtrek)
     
-    # Teken alle Zaagsnedes X
     for px in posities_x:
         if vorm_type == "Rechthoek / Balk":
             ax1.axvline(x=px, color='red', linestyle='--', linewidth=1.2)
         else:
-            # Bij L-vorm: lijn stopt bij de rand van de vorm
             y_max = l2 if px <= dikte else dikte
             ax1.plot([px, px], [0, y_max], color='red', linestyle='--', linewidth=1.2)
             
-    # Teken alle Zaagsnedes Y
     for py in posities_y:
         if vorm_type == "Rechthoek / Balk":
             ax1.axhline(y=py, color='red', linestyle='--', linewidth=1.2)
@@ -104,18 +101,21 @@ with col2:
 # --- OVERZICHT ---
 st.divider()
 st.subheader("📋 Overzicht Maten")
+
+# De kolommen heten nu simpelweg 'Item' en 'Maat' om fouten te voorkomen
 overzicht_data = {
-    "Omschrijving": ["Lengte", "Breedte / Zijde 2", "Hoogte", "Materiaaldikte"],
-    "Maat (cm)": [f"{l1} cm", f"{l2} cm", f"{h} cm", f"{dikte} cm" if dikte > 0 else "N.v.t."]
+    "Item": ["Lengte (cm)", "Breedte (cm)", "Hoogte (cm)", "Dikte (cm)"],
+    "Waarde": [f"{l1}", f"{l2}", f"{h}", f"{dikte}" if dikte > 0 else "N.v.t."]
 }
 
-# Voeg dynamisch alle zaagsnedes toe aan de tabel
+# We voegen de zaagsnedes toe
 for i, px in enumerate(posities_x):
-    overzicht_data["Omschrijving"].append(f"Zaagsnede X-{i+1}")
-    overzicht_data["Maat"].append(f"{px} cm")
+    overzicht_data["Item"].append(f"Zaagsnede X-{i+1} (cm)")
+    overzicht_data["Waarde"].append(f"{px}")
 
 for i, py in enumerate(posities_y):
-    overzicht_data["Omschrijving"].append(f"Zaagsnede Y-{i+1}")
-    overzicht_data["Maat"].append(f"{py} cm")
+    overzicht_data["Item"].append(f"Zaagsnede Y-{i+1} (cm)")
+    overzicht_data["Waarde"].append(f"{py}")
 
+# Tabel tonen
 st.table(pd.DataFrame(overzicht_data))

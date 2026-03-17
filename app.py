@@ -3,67 +3,67 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 
-st.set_page_config(page_title="Maten Tool Pro", layout="wide")
-st.title("📐 3D Visualisatie met Schuine Hoeken")
+st.set_page_config(page_title="L-Vorm Tool", layout="wide")
+st.title("📐 3D L-Vorm Visualisatie")
 
 # Sidebar
-st.sidebar.header("Basis Maten")
-l = st.sidebar.number_input("Lengte (onder)", min_value=0.1, value=100.0)
-b = st.sidebar.number_input("Breedte (onder)", min_value=0.1, value=50.0)
-h = st.sidebar.number_input("Hoogte", min_value=0.0, value=40.0)
+st.sidebar.header("Afmetingen L-Vorm")
+l1 = st.sidebar.number_input("Lengte Zijde 1 (cm)", min_value=1.0, value=100.0)
+l2 = st.sidebar.number_input("Lengte Zijde 2 (cm)", min_value=1.0, value=60.0)
+dikte = st.sidebar.number_input("Materiaaldikte (cm)", min_value=0.1, value=20.0)
+h = st.sidebar.number_input("Hoogte (cm)", min_value=0.1, value=30.0)
 
-st.sidebar.header("Hoek Instellingen (Offset)")
-off_x = st.sidebar.number_input("Verschuiving X (bovenkant)", value=20.0)
-off_y = st.sidebar.number_input("Verschuiving Y (bovenkant)", value=0.0)
-
-# Berekening punten
-# Onderkant (0 hoogte)
+# Definieer de 6 grondpunten van de L-vorm
+# We tekenen de L in het X-Y vlak
 p0 = [0, 0, 0]
-p1 = [l, 0, 0]
-p2 = [l, b, 0]
-p3 = [0, b, 0]
+p1 = [l1, 0, 0]
+p2 = [l1, dikte, 0]
+p3 = [dikte, dikte, 0]
+p4 = [dikte, l2, 0]
+p5 = [0, l2, 0]
 
-# Bovenkant (met offset)
-p4 = [off_x, off_y, h]
-p5 = [l + off_x, off_y, h]
-p6 = [l + off_x, b + off_y, h]
-p7 = [off_x, b + off_y, h]
+grondpunten = [p0, p1, p2, p3, p4, p5]
 
-v = np.array([p0, p1, p2, p3, p4, p5, p6, p7])
+# Maak de 3D punten (onderkant en bovenkant)
+v = []
+for p in grondpunten:
+    v.append(p) # Onderkant (z=0)
+for p in grondpunten:
+    v.append([p[0], p[1], h]) # Bovenkant (z=h)
 
-# Vlakken definieren
+v = np.array(v)
+
+# Definieer de vlakken (6 zijwanden + onderkant + bovenkant)
 vlakken = [
-    [v[0], v[1], v[2], v[3]], # Onder
-    [v[4], v[5], v[6], v[7]], # Boven
-    [v[0], v[1], v[5], v[4]], # Voor
-    [v[2], v[3], v[7], v[6]], # Achter
-    [v[1], v[2], v[6], v[5]], # Rechts
-    [v[0], v[3], v[7], v[4]]  # Links
+    [v[0], v[1], v[2], v[3], v[4], v[5]], # Bodem
+    [v[6], v[7], v[8], v[9], v[10], v[11]], # Deksel
+    [v[0], v[1], v[7], v[6]], # Buitenkant lang
+    [v[1], v[2], v[8], v[7]], # Kopse kant 1
+    [v[2], v[3], v[9], v[8]], # Binnenhoek 1
+    [v[3], v[4], v[10], v[9]], # Binnenhoek 2
+    [v[4], v[5], v[11], v[10]], # Kopse kant 2
+    [v[5], v[0], v[6], v[11]]  # Buitenkant kort
 ]
 
+# Tekenen
 fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111, projection='3d')
 
-# Teken de vorm
-poly = Poly3DCollection(vlakken, facecolors='cyan', linewidths=1, edgecolors='blue', alpha=.20)
+poly = Poly3DCollection(vlakken, facecolors='orange', linewidths=1, edgecolors='brown', alpha=.5)
 ax.add_collection3d(poly)
 
-# Schaling en assen
-all_points = v
-max_val = np.max(all_points)
-min_val = np.min(all_points)
+# Schaling instellen
+max_dim = max(l1, l2, h)
+ax.set_xlim(0, max_dim)
+ax.set_ylim(0, max_dim)
+ax.set_zlim(0, max_dim)
 
-ax.set_xlim(min_val, max_val)
-ax.set_ylim(min_val, max_val)
-ax.set_zlim(0, max_val)
-
-# Grid verwijderen
+# Grid uit
 ax.grid(False)
 ax.xaxis.pane.fill = ax.yaxis.pane.fill = ax.zaxis.pane.fill = False
+ax.set_xlabel('Lengte 1')
+ax.set_ylabel('Lengte 2')
 
 st.pyplot(fig)
 
-# Bereken de hoek in graden voor de gebruiker
-if h > 0:
-    hoek_x = np.degrees(np.arctan(off_x / h))
-    st.info(f"De hoek van de zijwand t.o.v. verticaal is ongeveer **{abs(hoek_x):.1f}°**")
+st.info(f"Dit object heeft een totaal grondoppervlak van: **{(l1 * dikte) + ((l2 - dikte) * dikte):.1f} cm²**")

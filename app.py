@@ -64,7 +64,6 @@ with col_r:
 st.divider()
 
 # --- SIDEBAR ---
-# 1. Selectie standaardmaten (NU BOVENAAN)
 with st.sidebar.expander("Snelkeuze Steenformaat", expanded=True):
     keuze_naam = st.selectbox("Kies standaard maat", list(steen_maten.keys()))
     std_l, std_b, std_h = steen_maten[keuze_naam]
@@ -72,7 +71,6 @@ with st.sidebar.expander("Snelkeuze Steenformaat", expanded=True):
 vorm_type = st.sidebar.selectbox("Type product", ["Steen", "Hoek"])
 zaag_dikte = st.sidebar.slider("Zaagblad dikte (mm)", 0.0, 5.0, 3.0)
 
-# 2. Afmetingen (worden gevuld vanuit selectie)
 with st.sidebar.expander("Afmetingen Aanpassen", expanded=True):
     l1 = st.number_input("Lengte L1 (mm)", value=float(std_l))
     l2 = st.number_input("Breedte/Lengte L2 (mm)", value=float(std_b))
@@ -87,12 +85,11 @@ with st.sidebar.expander("Afmetingen Aanpassen", expanded=True):
         grond_poly = np.array([[0,0], [l1,0], [l1,l2], [0,l2]])
         vlak_indices = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
 
-# 3. Zaaglijnen
-with st.sidebar.expander("Zaaglijnen (Rood)", expanded=False):
-    ax = st.slider("Aantal X-snedes", 0, 5, 0)
-    pos_x = [st.number_input(f"X{i+1}", value=23.0 if i==0 else l1-23, key=f"x{i}") for i in range(ax)]
-    ay = st.slider("Aantal Y-snedes", 0, 5, 0)
-    pos_y = [st.number_input(f"Y{i+1}", value=23.0 if i==0 else l2-23, key=f"y{i}") for i in range(ay)]
+with st.sidebar.expander("Zaaglijnen (Rood)", expanded=True):
+    ax_count = st.slider("Aantal X-snedes", 0, 5, 0)
+    pos_x = [st.number_input(f"X{i+1}", value=23.0 if i==0 else l1-23, key=f"x{i}") for i in range(ax_count)]
+    ay_count = st.slider("Aantal Y-snedes", 0, 5, 0)
+    pos_y = [st.number_input(f"Y{i+1}", value=23.0 if i==0 else l2-23, key=f"y{i}") for i in range(ay_count)]
 
 # --- VISUALISATIE ---
 col1, col2 = st.columns(2)
@@ -100,25 +97,36 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("2D Zaagplan")
     fig1, ax1 = plt.subplots(figsize=(6, 5))
-    ax1.add_patch(plt.Polygon(grond_poly, facecolor='lightgray', alpha=0.3, edgecolor='black'))
+    
+    # Teken de steen/hoek
+    poly = plt.Polygon(grond_poly, facecolor='lightgray', alpha=0.3, edgecolor='black', linewidth=1.5)
+    ax1.add_patch(poly)
 
+    # Zaaglijnen X
     for i, px in enumerate(pos_x):
         y_m = l2 if (vorm_type=="Steen" or px<=dikte) else dikte
-        ax1.add_patch(plt.Rectangle((px, 0), zaag_dikte, y_m, facecolor='red', alpha=0.6))
-        txt = f"X{i+1}: {int(px)}" if px <= l1/2 else f"X{i+1}: {int(px)} ({int(l1-px)} v. R)"
-        ax1.text(px, y_m+5, txt, color='red', weight='bold', fontsize=8, ha='center')
+        ax1.add_patch(plt.Rectangle((px, 0), zaag_dikte, y_m, facecolor='red', alpha=0.8))
+        # Slimme maatvoering
+        txt = f"X{i+1}: {int(px)}" if px <= l1/2 else f"X{i+1}: {int(px)} ({int(l1-px)} v.R)"
+        ax1.text(px, y_m + (l2*0.05), txt, color='red', weight='bold', fontsize=9, ha='center')
 
+    # Zaaglijnen Y
     for i, py in enumerate(pos_y):
         x_m = l1 if (vorm_type=="Steen" or py<=dikte) else dikte
-        ax1.add_patch(plt.Rectangle((0, py), x_m, zaag_dikte, facecolor='red', alpha=0.6))
-        txt = f"Y{i+1}: {int(py)}" if py <= l2/2 else f"Y{i+1}: {int(py)} ({int(l2-py)} v. B)"
-        ax1.text(x_m+5, py, txt, color='red', weight='bold', fontsize=8, va='center')
+        ax1.add_patch(plt.Rectangle((0, py), x_m, zaag_dikte, facecolor='red', alpha=0.8))
+        # Slimme maatvoering
+        txt = f"Y{i+1}: {int(py)}" if py <= l2/2 else f"Y{i+1}: {int(py)} ({int(l2-py)} v.B)"
+        ax1.text(x_m + (l1*0.05), py, txt, color='red', weight='bold', fontsize=9, va='center')
 
-    ax1.set_aspect('equal'); ax1.axis('off')
+    # Dynamische assen (GEFIXT)
+    ax1.set_xlim(-20, l1 + 60)
+    ax1.set_ylim(-20, l2 + 60)
+    ax1.set_aspect('equal')
+    ax1.axis('off')
     st.pyplot(fig1, dpi=80)
 
 with col2:
-    st.subheader("3D Vlakken Preview")
+    st.subheader("3D Preview")
     fig2 = plt.figure(); ax2 = fig2.add_subplot(111, projection='3d')
     v_3d = np.array([ [p[0],p[1],0] for p in grond_poly ] + [ [p[0],p[1],h] for p in grond_poly ])
     ax2.add_collection3d(Poly3DCollection([[v_3d[i] for i in idx] for idx in vlak_indices], facecolors='cyan', alpha=0.1, edgecolors='black'))
@@ -138,12 +146,14 @@ with col2:
     ax2.view_init(elev=20, azim=-35); ax2.axis('off')
     st.pyplot(fig2, dpi=80)
 
-# --- OVERZICHTSTABEL ---
+# --- OVERZICHT ---
 st.divider()
-st.subheader(f"📋 Werkinstructie: {keuze_naam}")
-overzicht = {"Omschrijving": ["L1 (Lengte)", "L2 (Breedte)", "H (Hoogte)"], "Maat (mm)": [l1, l2, h]}
-if vorm_type == "Hoek":
-    overzicht["Omschrijving"].append("D (Dikte)")
-    overzicht["Maat (mm)"].append(dikte)
+st.subheader(f"📋 Werkbon: {keuze_naam}")
+overzicht = []
+for i, px in enumerate(pos_x):
+    overzicht.append({"Type": "X-Snede", "Nr": i+1, "Maat vanaf links": f"{px} mm", "Maat vanaf rechts": f"{l1-px} mm"})
+for i, py in enumerate(pos_y):
+    overzicht.append({"Type": "Y-Snede", "Nr": i+1, "Maat vanaf onder": f"{py} mm", "Maat vanaf boven": f"{l2-py} mm"})
 
-st.table(pd.DataFrame(overzicht))
+if overzicht:
+    st.table(pd.DataFrame(overzicht))

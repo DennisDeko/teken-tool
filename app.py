@@ -49,7 +49,7 @@ with st.sidebar:
     
     A = st.number_input("A: Lengte product (mm)", value=base_L)
     B = st.number_input("B: Breedte/Diepte totaal (mm)", value=base_B)
-    C = st.number_input("C: Dikte/Hoogte product (mm)", value=23.0) # D is nu C geworden
+    C = st.number_input("C: Dikte product (mm)", value=23.0)
 
 # --- 3D ENGINE ---
 def genereer_3d_vlakken(profiel_2d, hoogte, z_offset=0):
@@ -63,12 +63,10 @@ def genereer_3d_vlakken(profiel_2d, hoogte, z_offset=0):
     return vlakken
 
 producten_3d = []
-# Bij strippen gebruiken we C voor de dikte van de strip, maar de 'hoogte' van het 3D object is de base_H
-if type_trans == "Strippen (2-zijdig)":
+if "Strippen" in type_trans:
     producten_3d.append(genereer_3d_vlakken([(0,0), (A,0), (A,C), (0,C)], base_H))
-    producten_3d.append(genereer_3d_vlakken([(0, B-C), (A, B-C), (A, B), (0, B)], base_H))
-elif type_trans == "Strippen (1-zijdig)":
-    producten_3d.append(genereer_3d_vlakken([(0,0), (A,0), (A,C), (0,C)], base_H))
+    if "2-zijdig" in type_trans:
+        producten_3d.append(genereer_3d_vlakken([(0, B-C), (A, B-C), (A, B), (0, B)], base_H))
 else:
     producten_3d.append(genereer_3d_vlakken([(0,0), (A,0), (A,B), (0,B)], base_H))
 
@@ -76,58 +74,49 @@ else:
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("2D Zaagplan (Maten A, B, C)")
+    st.subheader("2D Zaagplan")
     fig1, ax1 = plt.subplots(figsize=(6, 5))
-    
-    # Basissteen (Achtergrond)
     ax1.add_patch(plt.Rectangle((0,0), base_L, base_B, facecolor='gray', alpha=0.1, edgecolor='black', ls='--'))
 
     if "Strippen" in type_trans:
-        # Onderste strip
         ax1.add_patch(plt.Rectangle((0,0), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
-        # Maat C (Dikte)
         ax1.annotate('', xy=(A*0.15, 0), xytext=(A*0.15, C), arrowprops=dict(arrowstyle='<->', color='black'))
         ax1.text(A*0.17, C/2, f'C: {C}mm', fontweight='bold', va='center')
-        
-        if type_trans == "Strippen (2-zijdig)":
-            # Bovenste strip
+        if "2-zijdig" in type_trans:
             ax1.add_patch(plt.Rectangle((0, B-C), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
 
-    # Maat A (Lengte)
+    # Maten in 2D (A naar links, B verder naar rechts)
     ax1.annotate('', xy=(0, -15), xytext=(A, -15), arrowprops=dict(arrowstyle='<->', color='black'))
-    ax1.text(A/2, -30, f'A: {A}mm', ha='center', fontweight='bold')
+    ax1.text(-10, -30, f'A: {A}mm', ha='left', fontweight='bold') 
     
-    # Maat B (Breedte)
-    ax1.annotate('', xy=(A+15, 0), xytext=(A+15, B), arrowprops=dict(arrowstyle='<->', color='black'))
-    ax1.text(A+20, B/2, f'B: {B}mm', va='center', fontweight='bold', rotation=270)
+    ax1.annotate('', xy=(A+35, 0), xytext=(A+35, B), arrowprops=dict(arrowstyle='<->', color='black'))
+    ax1.text(A+55, B/2, f'B: {B}mm', va='center', fontweight='bold', rotation=270) 
 
-    ax1.set_xlim(-50, base_L + 70); ax1.set_ylim(-50, base_B + 70)
+    ax1.set_xlim(-70, base_L + 120); ax1.set_ylim(-70, base_B + 100)
     ax1.set_aspect('equal'); ax1.axis('off')
     st.pyplot(fig1)
 
 with col2:
-    st.subheader("3D Preview (Maten A, B, C)")
+    st.subheader("3D Preview")
     fig2 = plt.figure(figsize=(6, 5)); ax2 = fig2.add_subplot(111, projection='3d')
-    
-    # Render producten
     for prod in producten_3d:
         ax2.add_collection3d(Poly3DCollection(prod, facecolors='cyan', alpha=0.7, edgecolors='blue'))
 
-    # Maatvoering in 3D
+    # Maten in 3D
     # A (Lengte)
-    ax2.plot([0, A], [-10, -10], [0, 0], color='black', lw=1.5)
-    ax2.text(A/2, -20, 0, f'A: {A}', fontweight='bold')
+    ax2.plot([0, A], [-20, -20], [0, 0], color='black', lw=1.5)
+    ax2.text(A/2, -35, 0, f'A: {A}mm', fontweight='bold', ha='center')
     
     # B (Breedte)
-    ax2.plot([A+10, A+10], [0, B], [0, 0], color='black', lw=1.5)
-    ax2.text(A+15, B/2, 0, f'B: {B}', fontweight='bold')
+    ax2.plot([A+20, A+20], [0, B], [0, 0], color='black', lw=1.5)
+    ax2.text(A+35, B/2, 0, f'B: {B}mm', fontweight='bold', va='center')
 
-    # C (Dikte/Hoogte) - weergegeven op de dikte van de strip
-    ax2.plot([-10, -10], [0, C if "Strippen" in type_trans else B], [0, 0], color='red', lw=2)
-    ax2.text(-25, 0, 0, f'C: {C}', color='red', fontweight='bold')
+    # C (Dikte) Zwevend boven de tekening
+    ax2.plot([A/2, A/2], [B/2, B/2], [base_H + 5, base_H + 25], color='red', lw=2)
+    ax2.text(A/2, B/2, base_H + 30, f'C: {C}mm', color='red', fontweight='bold', ha='center')
 
-    # Instellingen voor 3D aanzicht
-    lim = max(base_L, base_B, base_H)
+    # Bereik instellen voor goede weergave labels
+    lim = max(base_L, base_B, base_H + 40)
     ax2.set_xlim(0, lim); ax2.set_ylim(0, lim); ax2.set_zlim(0, lim)
     ax2.view_init(elev=25, azim=-40); ax2.axis('off')
     st.pyplot(fig2)
@@ -137,5 +126,5 @@ st.divider()
 st.table(pd.DataFrame([
     {"Maat": "A", "Omschrijving": "Lengte product", "Waarde": f"{A} mm"},
     {"Maat": "B", "Omschrijving": "Breedte totaal", "Waarde": f"{B} mm"},
-    {"Maat": "C", "Omschrijving": "Dikte/Hoogte product", "Waarde": f"{C} mm"}
+    {"Maat": "C", "Omschrijving": "Dikte product", "Waarde": f"{C} mm"}
 ]))

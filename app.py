@@ -69,25 +69,41 @@ with col_logo1:
     except: st.empty()
 with col_logo2:
     st.title("DEKO Maatwerk Editor Pro")
-    st.caption("Solide 3D Visualisatie")
 
 st.divider()
 
 # --- HELPER FUNCTIE: PDF GENERATIE ---
-def generate_pdf(df, fig, naam, l, b, h):
+def generate_pdf(df, fig, naam, l, b, h, ref, aantal):
     buf = BytesIO()
     p = canvas.Canvas(buf, pagesize=A4)
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, 800, f"WERKBON: {naam} ({l} x {b} x {h} mm)")
     
-    # Sla figuur op
+    # Header
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, 800, f"WERKBON: {naam}")
+    
+    # Project Info
+    p.setFont("Helvetica-Bold", 11)
+    p.drawString(50, 780, f"Referentie: ")
+    p.setFont("Helvetica", 11)
+    p.drawString(120, 780, f"{ref}")
+    
+    p.setFont("Helvetica-Bold", 11)
+    p.drawString(50, 765, f"Aantal stuks: ")
+    p.setFont("Helvetica", 11)
+    p.drawString(125, 765, f"{aantal}")
+    
+    p.setFont("Helvetica", 10)
+    p.drawString(50, 750, f"Basismaat: {l} x {b} x {h} mm")
+    p.line(50, 745, 550, 745)
+    
+    # Sla 2D figuur op
     img_buf = BytesIO()
     fig.savefig(img_buf, format='png', bbox_inches='tight', facecolor='white')
     img_buf.seek(0)
-    p.drawImage(ImageReader(img_buf), 50, 500, width=400, preserveAspectRatio=True)
+    p.drawImage(ImageReader(img_buf), 50, 450, width=400, preserveAspectRatio=True)
     
-    p.setFont("Helvetica-Bold", 12); p.drawString(50, 480, "Zaagsnedes Details:")
-    y_pos = 460
+    p.setFont("Helvetica-Bold", 12); p.drawString(50, 430, "Zaagsnedes Details:")
+    y_pos = 410
     p.setFont("Helvetica", 10)
     for _, row in df.iterrows():
         p.drawString(50, y_pos, f"{row['Type']} {row['Nr']}: {row['Maat vanaf Links']} | {row['Maat vanaf Rechts']}")
@@ -98,7 +114,12 @@ def generate_pdf(df, fig, naam, l, b, h):
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("Instellingen")
+    st.header("Project Informatie")
+    veld_referentie = st.text_input("Referentie / Projectnaam", placeholder="bijv. Project Kerkstraat")
+    aantal_stuks = st.number_input("Aantal stuks", min_value=1, value=1, step=1)
+    
+    st.divider()
+    st.header("Configuratie")
     
     def on_format_change():
         st.session_state['ax_count'] = 0
@@ -136,35 +157,28 @@ col_v1, col_v2 = st.columns(2)
 
 # --- 2D ZAAGPLAN ---
 with col_v1:
-    st.subheader("📐 2D Zaagplan met Maten")
+    st.subheader("📐 2D Zaagplan")
     fig1, ax1 = plt.subplots(figsize=(6, 5))
-    fig1.patch.set_alpha(0) # Transparant voor Streamlit
+    fig1.patch.set_alpha(0)
     
-    # Teken segmenten
     segs_x = [0] + sorted_x + [l1]
     for i in range(len(segs_x)-1):
         x_s, x_e = segs_x[i], segs_x[i+1]
-        f_col = '#5bc0de' if i == 0 else '#d3d3d3' # Hoofddeel blauw, rest grijs
+        f_col = '#5bc0de' if i == 0 else '#d3d3d3'
         seg_w = x_e - x_s
         
         if vorm_type == "Steen":
-            ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, l2, facecolor=f_col, edgecolor='black', alpha=1.0)) # Volledig solide in 2D
-            # Segmentmaat binnenin
-            ax1.text(x_s + seg_w/2, l2/2, f"{int(seg_w)}", ha='center', va='center', color='black', weight='bold')
+            ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, l2, facecolor=f_col, edgecolor='black', alpha=1.0))
+            ax1.text(x_s + seg_w/2, l2/2, f"{int(seg_w)}", ha='center', va='center', weight='bold')
         else:
-            # Hoek-segmentatie in 2D
             if i == 0:
                 poly = MatplotlibPolygon(grond_poly, facecolor='#5bc0de', edgecolor='black', alpha=1.0)
                 ax1.add_patch(poly)
-                # Hoofddeelmaat L1-D
-                ax1.text(dikte + (l1-dikte)/2, dikte/2, f"{int(l1-dikte)}", ha='center', va='center', color='black', weight='bold')
             else:
                 y_h = dikte if x_s >= dikte else l2
                 ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, y_h, facecolor='#d3d3d3', edgecolor='black', alpha=1.0))
-                # Segmentmaat reststuk
-                ax1.text(x_s + seg_w/2, y_h/2, f"{int(seg_w)}", ha='center', va='center', color='black', weight='bold')
+                ax1.text(x_s + seg_w/2, y_h/2, f"{int(seg_w)}", ha='center', va='center', weight='bold')
 
-    # Zaaglijnen
     for px in sorted_x:
         y_m = l2 if (vorm_type=="Steen" or px <= dikte) else dikte
         ax1.add_patch(plt.Rectangle((px - zaag_dikte/2, 0), zaag_dikte, y_m, color='red', zorder=10))
@@ -181,51 +195,37 @@ with col_v2:
     st.subheader("📦 Solide 3D Preview")
     fig3d = go.Figure()
 
-    def add_cube(fig, x_r, y_r, z_r, color, name, flatshading=True):
+    def add_cube(fig, x_r, y_r, z_r, color, name):
         if x_r[1] <= x_r[0] or y_r[1] <= y_r[0]: return
         fig.add_trace(go.Mesh3d(
             x=[x_r[0], x_r[1], x_r[1], x_r[0], x_r[0], x_r[1], x_r[1], x_r[0]],
             y=[y_r[0], y_r[0], y_r[1], y_r[1], y_r[0], y_r[0], y_r[1], y_r[1]],
             z=[0, 0, 0, 0, h, h, h, h],
             i=[7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2], j=[3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3], k=[0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
-            color=color, flatshading=flatshading, name=name, showscale=False # Opacity verwijderd voor solide
+            color=color, flatshading=True, name=name, showscale=False
         ))
 
-    # Segmentatie X
     curr_x = 0
     for i, next_x in enumerate(segs_x[1:]):
         c = '#5bc0de' if i == 0 else '#f0ad4e'
         s_x = curr_x + (zaag_dikte/2 if curr_x > 0 else 0)
         e_x = next_x - (zaag_dikte/2 if next_x < l1 else 0)
-        
         if vorm_type == "Steen":
-            add_cube(fig3d, (s_x, e_x), (0, l2), (0, h), c, f"Seg {i+1}")
+            add_cube(fig3d, (s_x, e_x), (0, l2), (0, h), c, f"Deel {i+1}")
         else:
-            add_cube(fig3d, (s_x, e_x), (0, dikte), (0, h), c, f"Deel X {i+1}")
+            add_cube(fig3d, (s_x, e_x), (0, dikte), (0, h), c, f"X-Deel {i+1}")
             if i == 0 and l2 > dikte:
-                add_cube(fig3d, (0, dikte), (dikte, l2), (0, h), c, f"Deel Y")
+                add_cube(fig3d, (0, dikte), (dikte, l2), (0, h), c, "Y-Deel")
         curr_x = next_x
 
-    # Zaagsnedes Rood
     for px in sorted_x:
         y_m = l2 if (vorm_type=="Steen" or px <= dikte) else dikte
-        add_cube(fig3d, (px-zaag_dikte/2, px+zaag_dikte/2), (0, y_m), (0, h), 'red', "Zaag X", flatshading=True) # Ook zaagsnedes solide
-    for py in sorted_y:
-        x_m = l1 if (vorm_type=="Steen" or py <= dikte) else dikte
-        add_cube(fig3d, (0, x_m), (py-zaag_dikte/2, py+zaag_dikte/2), (0, h), 'red', "Zaag Y", flatshading=True) # Ook zaagsnedes solide
-
-    fig3d.update_layout(
-        scene=dict(
-            xaxis_title=f"L1: {int(l1)}",
-            yaxis_title=f"L2: {int(l2)}",
-            zaxis_title=f"H: {int(h)}",
-            aspectmode='data'
-        ),
-        margin=dict(l=0,r=0,b=0,t=0)
-    )
+        add_cube(fig3d, (px-zaag_dikte/2, px+zaag_dikte/2), (0, y_m), (0, h), 'red', "Zaag")
+    
+    fig3d.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0,r=0,b=0,t=0))
     st.plotly_chart(fig3d, use_container_width=True)
 
-# --- OVERZICHT ---
+# --- OVERZICHT & PDF ---
 st.divider()
 data = []
 for i, px in enumerate(pos_x): data.append({"Type": "X-Snede", "Nr": i+1, "Maat vanaf Links": f"{px}mm", "Maat vanaf Rechts": f"{l1-px}mm"})
@@ -233,9 +233,11 @@ for i, py in enumerate(pos_y): data.append({"Type": "Y-Snede", "Nr": i+1, "Maat 
 df_wb = pd.DataFrame(data)
 
 c1, c2 = st.columns([2, 1])
-with c1: st.dataframe(df_wb, use_container_width=True, hide_index=True)
+with c1: 
+    st.subheader(f"Overzicht: {veld_referentie if veld_referentie else 'Geen referentie'}")
+    st.write(f"**Aantal:** {aantal_stuks} stuks")
+    st.dataframe(df_wb, use_container_width=True, hide_index=True)
 with c2:
     if not df_wb.empty:
-        # Genereer PDF data
-        pdf_data = generate_pdf(df_wb, fig1, keuze_naam, l1, l2, h)
-        st.download_button("📄 Download PDF Werkbon", pdf_data, f"Werkbon_{keuze_naam}.pdf", "application/pdf")
+        pdf_data = generate_pdf(df_wb, fig1, keuze_naam, l1, l2, h, veld_referentie, aantal_stuks)
+        st.download_button("📄 Download PDF Werkbon", pdf_data, f"Werkbon_{veld_referentie if veld_referentie else 'DEKO'}.pdf", "application/pdf")

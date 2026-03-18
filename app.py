@@ -65,78 +65,18 @@ steen_maten = {
 LOGO_URL = "https://raw.githubusercontent.com/DennisDeko/teken-tool/main/deko_logo.jpg"
 col_l, col_r = st.columns([1, 4])
 with col_l:
-    try:
-        st.image(LOGO_URL, width=150)
+    try: st.image(LOGO_URL, width=150)
     except: st.warning("Logo niet gevonden")
 with col_r:
     st.title("DEKO Maatwerk Editor Pro")
-    st.caption("Interactieve 2D Technische Tekeningen & Solide 3D Previews")
+    st.caption("Visuele segmentatie: Hoofddeel vs. Reststukken")
 
 st.divider()
 
-# --- HELPER FUNCTIE: PDF GENERATIE (GEFIXTE VERSIE) ---
-def generate_pdf(overzicht_df, fig2d, keuze_naam, l1, l2, h):
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    
-    # Header
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, height - 50, f"WERKBON: {keuze_naam}")
-    p.setFont("Helvetica", 10)
-    p.drawString(50, height - 65, f"Afmetingen basis: {l1} x {l2} x {h} mm")
-    p.line(50, height - 75, width - 50, height - 75)
-    
-    # 2D Tekening invoegen
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, height - 100, "Zaagplan 2D")
-    
-    img_buffer = BytesIO()
-    # Gebruik bbox_inches='tight' om witte randen te minimaliseren
-    fig2d.savefig(img_buffer, format='png', bbox_inches='tight', dpi=150, facecolor='white')
-    img_buffer.seek(0)
-    
-    # --- DE FIX VOOR DRAWIMAGE ---
-    afbeelding = ImageReader(img_buffer)
-    p.drawImage(afbeelding, 50, height - 350, width=300, preserveAspectRatio=True)
-    # -----------------------------
-    
-    # Tabel
-    p.drawString(50, height - 380, "Zaagsnedes Details")
-    ty = height - 400
-    p.setFont("Helvetica-Bold", 10)
-    
-    # Tabel headers
-    cols = ["Type", "Nr", "Vanaf As 1", "Vanaf As 2"]
-    x_offsets = [50, 150, 200, 320]
-    for i, col in enumerate(cols):
-        p.drawString(x_offsets[i], ty, col)
-    
-    ty -= 20
-    p.setFont("Helvetica", 10)
-    for index, row in overzicht_df.iterrows():
-        if ty < 50: # Nieuwe pagina als tabel te lang is
-            p.showPage()
-            ty = height - 50
-            p.setFont("Helvetica", 10)
-            
-        p.drawString(x_offsets[0], ty, str(row['Type']))
-        p.drawString(x_offsets[1], ty, str(row['Nr']))
-        p.drawString(x_offsets[2], ty, str(row['Maat vanaf As 1']))
-        p.drawString(x_offsets[3], ty, str(row['Maat vanaf As 2']))
-        p.line(50, ty-5, width-50, ty-5)
-        ty -= 20
-        
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    return buffer
-
-# --- SIDEBAR & LOGICA ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("Configuratie")
     
-    # Snelkeuze met Session State om posities te resetten bij formaatwijziging
     def on_format_change():
         st.session_state['ax_count'] = 0
         st.session_state['ay_count'] = 0
@@ -153,177 +93,132 @@ with st.sidebar:
         l2 = col_b.number_input("L2 (mm)", value=float(std_b))
         h = col_c.number_input("H (mm)", value=float(std_h))
         
+        dikte = 0.0
         if vorm_type == "Hoek":
             dikte = st.number_input("Dikte D (mm)", value=min(23.0, l1/2, l2/2))
             grond_poly = np.array([[0,0], [l1,0], [l1,dikte], [dikte,dikte], [dikte,l2], [0,l2]])
         else:
-            dikte = 0.0
             grond_poly = np.array([[0,0], [l1,0], [l1,l2], [0,l2]])
 
-    # Zaaglijnen Sectie
     with st.expander("Zaaglijnen", expanded=True):
         ax_count = st.slider("Aantal X-snedes", 0, 5, key='ax_count')
-        pos_x = [st.number_input(f"X{i+1} positie (mm)", value=23.0 if i==0 else l1-23, key=f"x_in_{i}") for i in range(ax_count)]
+        pos_x = [st.number_input(f"X{i+1}", value=23.0 if i==0 else l1-23, key=f"xi_{i}") for i in range(ax_count)]
         
-        st.markdown("---")
         ay_count = st.slider("Aantal Y-snedes", 0, 5, key='ay_count')
-        pos_y = [st.number_input(f"Y{i+1} positie (mm)", value=23.0 if i==0 else l2-23, key=f"y_in_{i}") for i in range(ay_count)]
+        pos_y = [st.number_input(f"Y{i+1}", value=23.0 if i==0 else l2-23, key=f"yi_{i}") for i in range(ay_count)]
 
-# --- HOOFDSCHERM VISUALISATIE ---
-col_vis1, col_vis2 = st.columns([1, 1])
+# --- VISUALISATIE LOGICA ---
+col_v1, col_v2 = st.columns(2)
 
-# --- 2D Zaagplan (Matplotlib) ---
-with col_vis1:
-    st.subheader("📐 2D Technische Tekening")
-    # Gebruik transparante achtergrond voor betere integratie in Streamlit
+# Sorteer snedes voor segmentatie
+sorted_x = sorted([px for px in pos_x if 0 < px < l1])
+sorted_y = sorted([py for py in pos_y if 0 < py < l2])
+
+# --- 2D ZAAGPLAN ---
+with col_v1:
+    st.subheader("📐 2D Zaagplan (Gekleurd)")
     fig1, ax1 = plt.subplots(figsize=(6, 5), facecolor='none')
     ax1.set_facecolor('none')
     
-    # 1. Teken de basisvorm (solide grijs)
-    poly = MatplotlibPolygon(grond_poly, facecolor='#eaeaea', alpha=1.0, edgecolor='#333333', linewidth=2, zorder=1)
-    ax1.add_patch(poly)
+    # Teken segmenten in verschillende kleuren
+    segs_x = [0] + sorted_x + [l1]
+    for i in range(len(segs_x)-1):
+        x_start = segs_x[i]
+        x_end = segs_x[i+1]
+        face_col = '#eaeaea' if i == 0 else '#dcdcdc' # Hoofddeel vs reststuk
+        edge_col = '#333333'
+        
+        if vorm_type == "Steen":
+            ax1.add_patch(plt.Rectangle((x_start, 0), x_end-x_start, l2, facecolor=face_col, edgecolor=edge_col, lw=1.5))
+        else:
+            # Voor hoekvorm is segmentatie complexer in 2D, we tekenen de basis en kleuren de reststukken eroverheen
+            if i == 0:
+                poly = MatplotlibPolygon(grond_poly, facecolor='#eaeaea', edgecolor='#333333', lw=1.5)
+                ax1.add_patch(poly)
+            else:
+                y_h = dikte if x_start >= dikte else l2
+                ax1.add_patch(plt.Rectangle((x_start, 0), x_end-x_start, y_h, facecolor='#dcdcdc', edgecolor='#333333', lw=1.5))
 
-    # 2. Zaagsnedes X
-    for i, px in enumerate(pos_x):
-        y_m = l2 if (vorm_type=="Steen" or px<=dikte) else dikte
-        # De zaagsnede zelf (Rood vlak)
-        ax1.add_patch(plt.Rectangle((px - zaag_dikte/2, 0), zaag_dikte, y_m, facecolor='#d9534f', alpha=1.0, zorder=3))
-        # Label
-        ax1.text(px, y_m + 5, f"X{i+1}", color='#d9534f', weight='bold', fontsize=9, ha='center')
+    # Zaaglijnen (Rood)
+    for px in sorted_x:
+        y_m = l2 if (vorm_type=="Steen" or px <= dikte) else dikte
+        ax1.add_patch(plt.Rectangle((px - zaag_dikte/2, 0), zaag_dikte, y_m, color='red', zorder=5))
+    for py in sorted_y:
+        x_m = l1 if (vorm_type=="Steen" or py <= dikte) else dikte
+        ax1.add_patch(plt.Rectangle((0, py - zaag_dikte/2), x_m, zaag_dikte, color='red', zorder=5))
 
-    # 3. Zaagsnedes Y
-    for i, py in enumerate(pos_y):
-        x_m = l1 if (vorm_type=="Steen" or py<=dikte) else dikte
-        # De zaagsnede zelf (Rood vlak)
-        ax1.add_patch(plt.Rectangle((0, py - zaag_dikte/2), x_m, zaag_dikte, facecolor='#d9534f', alpha=1.0, zorder=3))
-        # Label
-        ax1.text(x_m + 5, py, f"Y{i+1}", color='#d9534f', weight='bold', fontsize=9, va='center')
+    ax1.set_xlim(-20, l1+20); ax1.set_ylim(-20, l2+20)
+    ax1.set_aspect('equal'); ax1.axis('off')
+    st.pyplot(fig1)
 
-    # 4. Maatlijnen L1 & L2 (pijlen)
-    ax1.annotate('', xy=(0, -10), xytext=(l1, -10), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
-    ax1.text(l1/2, -18, f"{int(l1)} mm", ha='center', fontsize=9, color='black', weight='bold')
-    ax1.annotate('', xy=(-10, 0), xytext=(-10, l2), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
-    ax1.text(-18, l2/2, f"{int(l2)} mm", va='center', rotation='vertical', fontsize=9, color='black', weight='bold')
-
-    # 5. Assen optimalisatie
-    margin = 30
-    ax1.set_xlim(-margin, l1 + margin + 10)
-    ax1.set_ylim(-margin, l2 + margin + 10)
-    ax1.set_aspect('equal')
-    ax1.axis('off') # Verberg standaard assen
-    
-    st.pyplot(fig1, dpi=120, bbox_inches='tight')
-
-# --- 3D Preview (PLOTLY - SOLIDE) ---
-with col_vis2:
-    st.subheader("📦 Solide 3D Preview")
+# --- 3D PREVIEW ---
+with col_v2:
+    st.subheader("📦 3D Preview (Gekleurd)")
     fig3d = go.Figure()
 
-    # --- HELPER: SOLIDE CUBE MESH MAKEN ---
-    def add_solid_cube(fig, x_range, y_range, z_range, color, opacity, name):
-        x_min, x_max = x_range
-        y_min, y_max = y_range
-        z_min, z_max = z_range
-        
-        # Mesh3d vertices (8 hoekpunten)
+    def add_cube(fig, x_r, y_r, z_r, color, name):
+        if x_r[1] <= x_r[0] or y_r[1] <= y_r[0]: return
         fig.add_trace(go.Mesh3d(
-            x=[x_min, x_max, x_max, x_min, x_min, x_max, x_max, x_min],
-            y=[y_min, y_min, y_max, y_max, y_min, y_min, y_max, y_max],
-            z=[z_min, z_min, z_min, z_min, z_max, z_max, z_max, z_max],
-            # Mesh3d indices (verbind vertices tot vlakken)
-            i=[7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2],
-            j=[3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3],
-            k=[0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
-            opacity=opacity, color=color, name=name, showscale=False, flatshading=True
+            x=[x_r[0], x_r[1], x_r[1], x_r[0], x_r[0], x_r[1], x_r[1], x_r[0]],
+            y=[y_r[0], y_r[0], y_r[1], y_r[1], y_r[0], y_r[0], y_r[1], y_r[1]],
+            z=[z_r[0], z_r[0], z_r[0], z_r[0], z_r[1], z_r[1], z_r[1], z_r[1]],
+            i=[7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2], j=[3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3], k=[0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
+            color=color, opacity=0.9, flatshading=True, name=name
         ))
 
-    # --- BASISVORM TEKENEN ---
-    if vorm_type == "Steen":
-        # Een simpele solide box
-        add_solid_cube(fig3d, (0, l1), (0, l2), (0, h), '#5bc0de', 0.8, "Steen Basis")
-    else:
-        # Een hoek bestaat uit twee solide boxen
-        # Box 1 (Lange poot L1)
-        add_solid_cube(fig3d, (0, l1), (0, dikte), (0, h), '#5bc0de', 0.8, "Hoek Deel A")
-        # Box 2 (Korte poot L2, gecorrigeerd voor overlap)
-        if l2 > dikte:
-            add_solid_cube(fig3d, (0, dikte), (dikte, l2), (0, h), '#5bc0de', 0.8, "Hoek Deel B")
+    # X-Segmentatie 3D
+    current_x = 0
+    for i, next_x in enumerate(segs_x[1:]):
+        c = '#5bc0de' if i == 0 else '#f0ad4e' # Blauw vs Oranje
+        s_x = current_x + (zaag_dikte/2 if current_x > 0 else 0)
+        e_x = next_x - (zaag_dikte/2 if next_x < l1 else 0)
+        
+        if vorm_type == "Steen":
+            add_cube(fig3d, (s_x, e_x), (0, l2), (0, h), c, f"Deel {i+1}")
+        else:
+            add_cube(fig3d, (s_x, e_x), (0, dikte), (0, h), c, f"Deel {i+1}")
+            if i == 0 and l2 > dikte:
+                add_cube(fig3d, (0, dikte), (dikte, l2), (0, h), c, "Hoekpoot")
+        current_x = next_x
 
-    # --- ZAAGSNEDES TEKENEN (SOLIDE ROOD) ---
-    for px in pos_x:
-        if 0 <= px <= l1:
-            y_m = l2 if (vorm_type=="Steen" or px<=dikte) else dikte
-            # Maak een solide rode box dwars door de steen
-            add_solid_cube(fig3d, (px - zaag_dikte/2, px + zaag_dikte/2), (0, y_m), (0, h), '#d9534f', 1.0, "X-Snede")
+    # Zaagsnedes (Rood)
+    for px in sorted_x:
+        y_m = l2 if (vorm_type=="Steen" or px <= dikte) else dikte
+        add_cube(fig3d, (px-zaag_dikte/2, px+zaag_dikte/2), (0, y_m), (0, h), 'red', "Zaagsnede")
 
-    for py in pos_y:
-        if 0 <= py <= l2:
-            x_m = l1 if (vorm_type=="Steen" or py<=dikte) else dikte
-            # Maak een solide rode box dwars door de steen
-            add_solid_cube(fig3d, (0, x_m), (py - zaag_dikte/2, py + zaag_dikte/2), (0, h), '#d9534f', 1.0, "Y-Snede")
-
-    # Layout optimalisatie
-    max_dim = max(l1, l2, h, 10)
-    fig3d.update_layout(
-        scene=dict(
-            xaxis=dict(title='L1 (mm)', range=[0, max_dim]),
-            yaxis=dict(title='L2 (mm)', range=[0, max_dim]),
-            zaxis=dict(title='H (mm)', range=[0, max_dim]),
-            aspectmode='cube' # Houdt de verhoudingen correct
-        ),
-        margin=dict(r=0, l=0, b=0, t=0),
-        showlegend=False,
-        template="plotly_white"
-    )
-    
+    fig3d.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0,r=0,b=0,t=0))
     st.plotly_chart(fig3d, use_container_width=True)
 
-# --- OVERZICHT & EXPORT ---
+# --- PDF GENERATIE ---
+def generate_pdf(df, fig, naam, l, b, h):
+    buf = BytesIO()
+    p = canvas.Canvas(buf, pagesize=A4)
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, 800, f"WERKBON: {naam} ({l}x{b}x{h}mm)")
+    
+    img_buf = BytesIO()
+    fig.savefig(img_buf, format='png', bbox_inches='tight', white_background=True)
+    img_buf.seek(0)
+    p.drawImage(ImageReader(img_buf), 50, 500, width=400, preserveAspectRatio=True)
+    
+    p.setFont("Helvetica-Bold", 12); p.drawString(50, 480, "Zaagsnedes:")
+    y = 460
+    p.setFont("Helvetica", 10)
+    for _, r in df.iterrows():
+        p.drawString(50, y, f"{r['Type']} {r['Nr']}: {r['Maat vanaf As 1']} | {r['Maat vanaf As 2']}")
+        y -= 20
+    p.showPage(); p.save(); buf.seek(0)
+    return buf
+
+# --- OVERZICHT ---
 st.divider()
-col_u1, col_u2 = st.columns([2, 1])
+overzicht = []
+for i, px in enumerate(pos_x): overzicht.append({"Type": "X-Snede", "Nr": i+1, "Maat vanaf As 1": f"{px}mm (L)", "Maat vanaf As 2": f"{l1-px}mm (R)"})
+for i, py in enumerate(pos_y): overzicht.append({"Type": "Y-Snede", "Nr": i+1, "Maat vanaf As 1": f"{py}mm (O)", "Maat vanaf As 2": f"{l2-py}mm (B)"})
+df_wb = pd.DataFrame(overzicht)
 
-with col_u1:
-    st.subheader(f"📋 Werkbon Overzicht: {keuze_naam}")
-    st.caption(f"Zaagbladdikte: {zaag_dikte} mm.")
-    overzicht = []
-    
-    # Assen definiëren voor duidelijke taal op de werkbon
-    as1_x, as2_x = "Links", "Rechts"
-    as1_y, as2_y = "Onder", "Boven"
-    
-    for i, px in enumerate(pos_x):
-        if 0 <= px <= l1:
-            overzicht.append({
-                "Type": "X-Snede", 
-                "Nr": i+1, 
-                "Maat vanaf As 1": f"{px:.1f} mm ({as1_x})", 
-                "Maat vanaf As 2": f"{l1-px:.1f} mm ({as2_x})"
-            })
-    for i, py in enumerate(pos_y):
-        if 0 <= py <= l2:
-            overzicht.append({
-                "Type": "Y-Snede", 
-                "Nr": i+1, 
-                "Maat vanaf As 1": f"{py:.1f} mm ({as1_y})", 
-                "Maat vanaf As 2": f"{l2-py:.1f} mm ({as2_y})"
-            })
-
-    if overzicht:
-        df_werkbon = pd.DataFrame(overzicht)
-        # Styling van de tabel
-        st.dataframe(df_werkbon, use_container_width=True, hide_index=True)
-    else:
-        st.info("Voeg zaaglijnen toe in de sidebar om het overzicht te genereren.")
-
-with col_u2:
-    st.subheader("📥 Export")
-    if overzicht:
-        # PDF Genereren knop
-        pdf_buffer = generate_pdf(df_werkbon, fig1, keuze_naam, l1, l2, h)
-        st.download_button(
-            label="📄 Download Werkbon als PDF",
-            data=pdf_buffer,
-            file_name=f"DEKO_Werkbon_{keuze_naam.replace(' ', '_')}.pdf",
-            mime="application/pdf",
-        )
-    else: st.warning("Geen data om te exporteren.")
+c_t, c_d = st.columns([2, 1])
+with c_t: st.dataframe(df_wb, use_container_width=True, hide_index=True)
+with c_d:
+    if not df_wb.empty:
+        st.download_button("📄 Download PDF", generate_pdf(df_wb, fig1, keuze_naam, l1, l2, h), f"Werkbon_{keuze_naam}.pdf")

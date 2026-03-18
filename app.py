@@ -4,156 +4,125 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 import pandas as pd
 
-st.set_page_config(page_title="DEKO Transformaties", layout="wide")
+st.set_page_config(page_title="DEKO Maatwerk Editor Pro", layout="wide")
 
-# --- DATABASE STEENMATEN ---
+# --- DATABASE STANDAARD MATEN ---
 steen_maten = {
-    "Vrij invoeren": (210, 100, 50),
     "Waalformaat": (210, 100, 50),
-    "Dikformaat": (210, 100, 65),
+    "Dikformaat / waaldikformaat": (210, 100, 65),
     "Vechtformaat": (210, 100, 40),
     "Hilversums formaat": (240, 90, 40),
-    "Moduul 190-90-50": (190, 90, 50),
-    "Kloostermop I": (280, 105, 80)
+    "Brabantse steen": (180, 88, 53),
+    "Deens formaat": (228, 108, 54),
+    "Dordtse steen": (180, 88, 43),
+    "Dubbel waalformaat": (210, 100, 110),
+    "Euroformat": (188, 90, 88),
+    "Groninger steen": (240, 120, 60),
+    "IJsselformaat": (160, 78, 41),
+    "Kloostermop I": (280, 105, 80),
+    "Lilliput I": (160, 75, 35),
+    "Vrij invoeren": (210, 100, 50)
 }
-
-transformaties = [
-    "Strippen (2-zijdig)", "Strippen (1-zijdig)", "Sparren", "Afkorten", 
-    "Hoeken", "Hoeken plat (kopbakje)", "Koppen", "Kopstrippen", 
-    "Bakjes", "Zolen", "Lomkop", "Romkop", "Kimstenen"
-]
 
 # --- LOGO EN TITEL ---
 LOGO_URL = "https://raw.githubusercontent.com/DennisDeko/teken-tool/main/deko_logo.jpg"
 col_l, col_r = st.columns([1, 3])
 with col_l:
-    st.image(LOGO_URL, width=200)
+    st.image(LOGO_URL, width=180)
 with col_r:
-    st.title("DEKO 3D Product Generator")
+    st.title("DEKO Maatwerk Editor Pro")
 
 st.divider()
 
-# --- SIDEBAR LOGICA ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.header("1. Basis Steen")
-    keuze_naam = st.selectbox("Kies standaard maat", list(steen_maten.keys()))
-    std_l, std_b, std_h = steen_maten[keuze_naam]
-    base_L = st.number_input("Oorspronkelijke Lengte", value=float(std_l))
-    base_B = st.number_input("Oorspronkelijke Breedte", value=float(std_b))
-    base_H = st.number_input("Oorspronkelijke Hoogte", value=float(std_h))
+    with st.expander("Snelkeuze Steenformaat", expanded=True):
+        keuze_naam = st.selectbox("Kies standaard maat", list(steen_maten.keys()))
+        std_l, std_b, std_h = steen_maten[keuze_naam]
+
+    st.header("Transformatie Instellingen")
+    transformatie = st.selectbox("Type", ["Strippen", "Koppen", "Afkorten"])
+    aantal_zijden = st.radio("Aantal zijden", ["Enkelzijdig", "Dubbelzijdig"])
+    
     zaag_dikte = st.slider("Zaagblad dikte (mm)", 0.0, 5.0, 3.0)
 
-    st.header("2. Transformatie & Maten")
-    type_trans = st.selectbox("Kies bewerking", transformaties)
+    with st.expander("Afmetingen Basissteen", expanded=True):
+        l1 = st.number_input("Lengte L1 (mm)", value=float(std_l))
+        l2 = st.number_input("Breedte L2 (mm)", value=float(std_b))
+        h = st.number_input("Hoogte H (mm)", value=float(std_h))
+
+    with st.expander("Bewerkingsmaten", expanded=True):
+        dikte_strip = st.number_input("Dikte van de strip (mm)", value=23.0, min_value=1.0)
+
+# --- LOGICA VOOR STRIPPEN EN KOPPEN ---
+product_vlakken_2d = [] # [(x, y, w, h)]
+zaaglijnen_2d = []
+
+if transformatie == "Strippen":
+    # Strip 1 (Onderzijde)
+    product_vlakken_2d.append((0, 0, l1, dikte_strip))
+    zaaglijnen_2d.append((0, dikte_strip, l1, zaag_dikte))
     
-    # Dynamische Variabelen (Formulier Logica A, B, C, D, E, X)
-    A = st.number_input("A: Lengte product (mm)", value=base_L)
-    B = st.number_input("B: Breedte/Diepte (mm)", value=base_B)
-    C = st.number_input("C: Hoogte product (mm)", value=base_H)
+    if aantal_zijden == "Dubbelzijdig":
+        # Strip 2 (Bovenzijde)
+        product_vlakken_2d.append((0, l2 - dikte_strip, l1, dikte_strip))
+        zaaglijnen_2d.append((0, l2 - dikte_strip - zaag_dikte, l1, zaag_dikte))
+
+elif transformatie == "Koppen":
+    # Kop 1 (Links)
+    product_vlakken_2d.append((0, 0, dikte_strip, l2))
+    zaaglijnen_2d.append((dikte_strip, 0, zaag_dikte, l2))
     
-    # Bepaal Vorm Categorie en activeer specifieke velden
-    vorm_categorie = "Blok"
-    D, E, X = 0.0, 0.0, 0.0
-
-    if type_trans in ["Hoeken", "Hoeken plat (kopbakje)", "Lomkop", "Romkop"]:
-        vorm_categorie = "L-Vorm"
-        D = st.number_input("D: Dikte strek (mm)", value=23.0)
-        E = st.number_input("E: Dikte kop (mm)", value=23.0)
-    elif type_trans in ["Bakjes", "Kop bak", "Zolen"]:
-        vorm_categorie = "U-Vorm"
-        D = st.number_input("D: Dikte voorzijde (mm)", value=23.0)
-        E = st.number_input("E: Dikte zijwanden (mm)", value=23.0)
-    elif type_trans in ["Strippen (1-zijdig)", "Strippen (2-zijdig)", "Kopstrippen", "Kimstenen"]:
-        vorm_categorie = "Blok"
-        D = st.number_input("D: Strip/Zaag dikte (mm)", value=23.0)
-        B = D # Bij een strip wordt de productbreedte gelijk aan D
-    elif type_trans == "Afkorten":
-        vorm_categorie = "Blok"
-        X = st.number_input("X: Afkortmaat (mm)", value=base_L / 2)
-        A = X # Bij afkorten is de lengte gelijk aan X
-
-# --- 3D GEOMETRIE ENGINE ---
-def genereer_3d_vlakken(profiel_2d, hoogte_c):
-    vlakken = []
-    n = len(profiel_2d)
-    # Bodem en Top (Vlakken)
-    vlakken.append([[p[0], p[1], 0] for p in profiel_2d])
-    vlakken.append([[p[0], p[1], hoogte_c] for p in profiel_2d])
-    # Zijwanden genereren door de punten te verbinden
-    for i in range(n):
-        p1, p2 = profiel_2d[i], profiel_2d[(i+1)%n]
-        vlakken.append([[p1[0], p1[1], 0], [p2[0], p2[1], 0], [p2[0], p2[1], hoogte_c], [p1[0], p1[1], hoogte_c]])
-    return vlakken
-
-# 2D Profiel Punten (Bovenaanzicht)
-if vorm_categorie == "L-Vorm":
-    profiel = [(0,0), (A,0), (A,D), (E,D), (E,B), (0,B)]
-elif vorm_categorie == "U-Vorm":
-    # Een 'Bak' is een U-vorm: Lange voorzijde en 2 korte koppen
-    profiel = [(0,0), (A,0), (A,B), (A-E,B), (A-E,D), (E,D), (E,B), (0,B)]
-else: # Blok
-    profiel = [(0,0), (A,0), (A,B), (0,B)]
-
-# Genereer 3D Model
-product_vlakken = genereer_3d_vlakken(profiel, C)
+    if aantal_zijden == "Dubbelzijdig":
+        # Kop 2 (Rechts)
+        product_vlakken_2d.append((l1 - dikte_strip, 0, dikte_strip, l2))
+        zaaglijnen_2d.append((l1 - dikte_strip - zaag_dikte, 0, zaag_dikte, l2))
 
 # --- VISUALISATIE ---
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader(f"2D Profiel (Top View)")
+    st.subheader("2D Zaagplan")
     fig1, ax1 = plt.subplots(figsize=(6, 5))
-    
-    # Teken originele basissteen ("Restant/Afval" in transparant grijs)
-    basis_poly = plt.Polygon([(0,0), (base_L,0), (base_L,base_B), (0,base_B)], facecolor='gray', alpha=0.1, edgecolor='black', linestyle='--')
-    ax1.add_patch(basis_poly)
+    # Basissteen (grijs restant)
+    ax1.add_patch(plt.Rectangle((0, 0), l1, l2, facecolor='lightgray', alpha=0.3, edgecolor='black', linestyle='--'))
 
-    # Teken het uiteindelijke Product (in Cyaan)
-    product_poly = plt.Polygon(profiel, facecolor='cyan', alpha=0.6, edgecolor='blue', linewidth=2)
-    ax1.add_patch(product_poly)
+    # De Blauwe Strippen/Koppen
+    for (x, y, w, hb) in product_vlakken_2d:
+        ax1.add_patch(plt.Rectangle((x, y), w, hb, facecolor='cyan', alpha=0.7, edgecolor='blue', label='Strip'))
 
-    # As limieten
-    ax1.set_xlim(-20, base_L + 40)
-    ax1.set_ylim(-20, base_B + 40)
-    ax1.set_aspect('equal')
-    ax1.axis('off')
+    # De Rode Zaaglijnen
+    for (zx, zy, zw, zh) in zaaglijnen_2d:
+        ax1.add_patch(plt.Rectangle((zx, zy), zw, zh, facecolor='red', alpha=0.8))
+
+    ax1.set_xlim(-10, l1 + 20); ax1.set_ylim(-10, l2 + 20)
+    ax1.set_aspect('equal'); ax1.axis('off')
     st.pyplot(fig1, dpi=80)
 
 with col2:
-    st.subheader("3D Product Render")
-    fig2 = plt.figure(figsize=(6, 5))
-    ax2 = fig2.add_subplot(111, projection='3d')
+    st.subheader("3D Preview")
+    fig2 = plt.figure(); ax2 = fig2.add_subplot(111, projection='3d')
     
-    # Teken Basissteen Spook (Restant)
-    z = np.array([[0,0,0], [base_L,0,0], [base_L,base_B,0], [0,base_B,0], [0,0,base_H], [base_L,0,base_H], [base_L,base_B,base_H], [0,base_B,base_H]])
-    basis_vlakken = [[z[0],z[1],z[2],z[3]], [z[4],z[5],z[6],z[7]], [z[0],z[1],z[5],z[4]], [z[1],z[2],z[6],z[5]], [z[2],z[3],z[7],z[6]], [z[3],z[0],z[4],z[7]]]
-    ax2.add_collection3d(Poly3DCollection(basis_vlakken, facecolors='gray', alpha=0.05, edgecolors='black', linestyles=':'))
+    # Basis blok (spookvorm)
+    z = np.array([[0,0,0], [l1,0,0], [l1,l2,0], [0,l2,0], [0,0,h], [l1,0,h], [l1,l2,h], [0,l2,h]])
+    vlak_indices = [[0,1,2,3], [4,5,6,7], [0,1,5,4], [1,2,6,5], [2,3,7,6], [3,0,4,7]]
+    ax2.add_collection3d(Poly3DCollection([[z[i] for i in idx] for idx in vlak_indices], facecolors='gray', alpha=0.05, edgecolors='black'))
 
-    # Teken Product
-    ax2.add_collection3d(Poly3DCollection(product_vlakken, facecolors='cyan', alpha=0.8, edgecolors='blue'))
+    # Blauwe Strippen in 3D
+    for (x, y, w, hb) in product_vlakken_2d:
+        sz = np.array([[x,y,0], [x+w,y,0], [x+w,y+hb,0], [x,y+hb,0], [x,y,h], [x+w,y,h], [x+w,y+hb,h], [x,y+hb,h]])
+        s_vlakken = [[0,1,2,3], [4,5,6,7], [0,1,5,4], [1,2,6,5], [2,3,7,6], [3,0,4,7]]
+        ax2.add_collection3d(Poly3DCollection([[sz[i] for i in idx] for idx in s_vlakken], facecolors='cyan', alpha=0.6, edgecolors='blue'))
 
-    ax2.set_xlim(0, max(base_L, base_B, base_H))
-    ax2.set_ylim(0, max(base_L, base_B, base_H))
-    ax2.set_zlim(0, max(base_L, base_B, base_H))
-    ax2.view_init(elev=30, azim=-45)
-    ax2.axis('off')
+    ax2.set_xlim(0, max(l1,l2,h)); ax2.set_ylim(0, max(l1,l2,h)); ax2.set_zlim(0, max(l1,l2,h))
+    ax2.view_init(elev=20, azim=-35); ax2.axis('off')
     st.pyplot(fig2, dpi=80)
 
-# --- DATATABEL (PDF FORMULIER EXACT) ---
+# --- OVERZICHTSTABEL ---
 st.divider()
-st.subheader(f"📋 Maatvoering (Ref: Formulier DEKO)")
-
-data = [
-    {"Maat": "A", "Waarde (mm)": A, "Omschrijving": "Lengte eindproduct"},
-    {"Maat": "B", "Waarde (mm)": B, "Omschrijving": "Breedte/Diepte eindproduct"},
-    {"Maat": "C", "Waarde (mm)": C, "Omschrijving": "Hoogte eindproduct"}
-]
-
-if vorm_categorie in ["L-Vorm", "U-Vorm"] or D > 0:
-    data.append({"Maat": "D", "Waarde (mm)": D, "Omschrijving": "Wanddikte 1 (Strek / Voorzijde)"})
-if vorm_categorie in ["L-Vorm", "U-Vorm"]:
-    data.append({"Maat": "E", "Waarde (mm)": E, "Omschrijving": "Wanddikte 2 (Kop / Zijwanden)"})
-if type_trans == "Afkorten":
-    data.append({"Maat": "X", "Waarde (mm)": X, "Omschrijving": "Afkortmaat"})
-
-st.table(pd.DataFrame(data))
+st.subheader("📋 Productiedetails")
+df_data = {
+    "Onderdeel": ["Gekozen Steen", "Bewerking", "Strip Dikte", "Aantal Strippen"],
+    "Waarde": [keuze_naam, transformatie, f"{dikte_strip} mm", "2" if aantal_zijden == "Dubbelzijdig" else "1"]
+}
+st.table(pd.DataFrame(df_data))

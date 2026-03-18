@@ -36,20 +36,25 @@ st.divider()
 
 # --- SIDEBAR LOGICA ---
 with st.sidebar:
-    st.header("1. Basis Steen")
+    st.header("1. Projectinformatie")
+    project_naam = st.text_input("Project", value="Nieuwbouw Elst")
+    sortering = st.text_input("Sortering", value="Rood genuanceerd")
+    stuks = st.number_input("Aantal stuks", value=100, step=1)
+
+    st.header("2. Basis Steen")
     keuze_naam = st.selectbox("Kies standaard maat", list(steen_maten.keys()))
     std_l, std_b, std_h = steen_maten[keuze_naam]
-    base_L = st.number_input("Oorspronkelijke Lengte", value=float(std_l))
-    base_B = st.number_input("Oorspronkelijke Breedte", value=float(std_b))
-    base_H = st.number_input("Oorspronkelijke Hoogte", value=float(std_h))
+    base_L = int(st.number_input("Oorspronkelijke Lengte", value=float(std_l)))
+    base_B = int(st.number_input("Oorspronkelijke Breedte", value=float(std_b)))
+    base_H = int(st.number_input("Oorspronkelijke Hoogte", value=float(std_h)))
     zaag_dikte = st.slider("Zaagblad dikte (mm)", 0.0, 5.0, 3.0)
 
-    st.header("2. Transformatie & Maten")
+    st.header("3. Transformatie & Maten")
     type_trans = st.selectbox("Kies bewerking", transformaties)
     
-    A = st.number_input("A: Lengte product (mm)", value=base_L)
-    B = st.number_input("B: Breedte/Diepte totaal (mm)", value=base_B)
-    C = st.number_input("C: Dikte product (mm)", value=23.0)
+    A = int(st.number_input("A: Lengte product (mm)", value=float(base_L)))
+    C = int(st.number_input("C: Dikte strip (mm)", value=23))
+    B_hoogte = int(st.number_input("B: Hoogte product (mm)", value=float(base_H)))
 
 # --- 3D ENGINE ---
 def genereer_3d_vlakken(profiel_2d, hoogte, z_offset=0):
@@ -64,11 +69,11 @@ def genereer_3d_vlakken(profiel_2d, hoogte, z_offset=0):
 
 producten_3d = []
 if "Strippen" in type_trans:
-    producten_3d.append(genereer_3d_vlakken([(0,0), (A,0), (A,C), (0,C)], base_H))
+    producten_3d.append(genereer_3d_vlakken([(0,0), (A,0), (A,C), (0,C)], B_hoogte))
     if "2-zijdig" in type_trans:
-        producten_3d.append(genereer_3d_vlakken([(0, B-C), (A, B-C), (A, B), (0, B)], base_H))
+        producten_3d.append(genereer_3d_vlakken([(0, base_B-C), (A, base_B-C), (A, base_B), (0, base_B)], B_hoogte))
 else:
-    producten_3d.append(genereer_3d_vlakken([(0,0), (A,0), (A,B), (0,B)], base_H))
+    producten_3d.append(genereer_3d_vlakken([(0,0), (A,0), (A,base_B), (0,base_B)], B_hoogte))
 
 # --- VISUALISATIE ---
 col1, col2 = st.columns(2)
@@ -81,18 +86,17 @@ with col1:
     if "Strippen" in type_trans:
         ax1.add_patch(plt.Rectangle((0,0), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
         ax1.annotate('', xy=(A*0.15, 0), xytext=(A*0.15, C), arrowprops=dict(arrowstyle='<->', color='black'))
-        ax1.text(A*0.17, C/2, f'C: {C}mm', fontweight='bold', va='center')
+        ax1.text(A*0.17, C/2, f'C: {C}', fontweight='bold', va='center')
         if "2-zijdig" in type_trans:
-            ax1.add_patch(plt.Rectangle((0, B-C), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
+            ax1.add_patch(plt.Rectangle((0, base_B-C), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
 
-    # Maten in 2D (A naar links, B verder naar rechts)
     ax1.annotate('', xy=(0, -15), xytext=(A, -15), arrowprops=dict(arrowstyle='<->', color='black'))
-    ax1.text(-10, -30, f'A: {A}mm', ha='left', fontweight='bold') 
+    ax1.text(-25, -30, f'A: {A}', ha='left', fontweight='bold') 
     
-    ax1.annotate('', xy=(A+35, 0), xytext=(A+35, B), arrowprops=dict(arrowstyle='<->', color='black'))
-    ax1.text(A+55, B/2, f'B: {B}mm', va='center', fontweight='bold', rotation=270) 
+    ax1.annotate('', xy=(A+35, 0), xytext=(A+35, base_B), arrowprops=dict(arrowstyle='<->', color='black'))
+    ax1.text(A+55, base_B/2, f'B: {B_hoogte}', va='center', fontweight='bold', rotation=270) 
 
-    ax1.set_xlim(-70, base_L + 120); ax1.set_ylim(-70, base_B + 100)
+    ax1.set_xlim(-80, base_L + 120); ax1.set_ylim(-60, base_B + 80)
     ax1.set_aspect('equal'); ax1.axis('off')
     st.pyplot(fig1)
 
@@ -102,29 +106,33 @@ with col2:
     for prod in producten_3d:
         ax2.add_collection3d(Poly3DCollection(prod, facecolors='cyan', alpha=0.7, edgecolors='blue'))
 
-    # Maten in 3D
-    # A (Lengte)
-    ax2.plot([0, A], [-20, -20], [0, 0], color='black', lw=1.5)
-    ax2.text(A/2, -35, 0, f'A: {A}mm', fontweight='bold', ha='center')
+    ax2.plot([0, A], [-25, -25], [0, 0], color='black', lw=1.5)
+    ax2.text(-40, -40, 0, f'A: {A}', fontweight='bold')
     
-    # B (Breedte)
-    ax2.plot([A+20, A+20], [0, B], [0, 0], color='black', lw=1.5)
-    ax2.text(A+35, B/2, 0, f'B: {B}mm', fontweight='bold', va='center')
+    ax2.plot([A+25, A+25], [0, 0], [0, B_hoogte], color='black', lw=1.5)
+    ax2.text(A+35, 0, B_hoogte/2, f'B: {B_hoogte}', fontweight='bold', va='center')
 
-    # C (Dikte) Zwevend boven de tekening
-    ax2.plot([A/2, A/2], [B/2, B/2], [base_H + 5, base_H + 25], color='red', lw=2)
-    ax2.text(A/2, B/2, base_H + 30, f'C: {C}mm', color='red', fontweight='bold', ha='center')
+    ax2.plot([A*0.2, A*0.2], [base_B/2, base_B/2], [B_hoogte + 15, B_hoogte + 40], color='red', lw=2)
+    ax2.text(A*0.05, base_B/2, B_hoogte + 45, f'C: {C}', color='red', fontweight='bold', ha='center')
 
-    # Bereik instellen voor goede weergave labels
-    lim = max(base_L, base_B, base_H + 40)
+    lim = max(base_L, base_B, B_hoogte + 60)
     ax2.set_xlim(0, lim); ax2.set_ylim(0, lim); ax2.set_zlim(0, lim)
     ax2.view_init(elev=25, azim=-40); ax2.axis('off')
     st.pyplot(fig2)
 
-# --- TABEL ---
+# --- OVERZICHTSTABEL ---
 st.divider()
-st.table(pd.DataFrame([
-    {"Maat": "A", "Omschrijving": "Lengte product", "Waarde": f"{A} mm"},
-    {"Maat": "B", "Omschrijving": "Breedte totaal", "Waarde": f"{B} mm"},
-    {"Maat": "C", "Omschrijving": "Dikte product", "Waarde": f"{C} mm"}
-]))
+col_a, col_b = st.columns(2)
+with col_a:
+    st.subheader("📋 Afmetingen")
+    st.table(pd.DataFrame([
+        {"Maat": "A", "Omschrijving": "Lengte product", "Waarde": f"{A}"},
+        {"Maat": "B", "Omschrijving": "Hoogte product", "Waarde": f"{B_hoogte}"},
+        {"Maat": "C", "Omschrijving": "Dikte product", "Waarde": f"{C}"}
+    ]))
+
+with col_b:
+    st.subheader("📄 Projectgegevens")
+    st.write(f"**Project:** {project_naam}")
+    st.write(f"**Sortering:** {sortering}")
+    st.write(f"**Aantal:** {stuks} stuks")

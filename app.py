@@ -4,53 +4,92 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 import pandas as pd
 
-# --- CONFIGURATIE ---
-st.set_page_config(page_title="DEKO Product Generator", layout="wide")
+st.set_page_config(page_title="DEKO Maten Tool Pro", layout="wide")
 
-# --- DATABASE STEENMATEN ---
+# --- DATABASE STANDAARD MATEN ---
 steen_maten = {
     "Vrij invoeren": (210, 100, 50),
     "Waalformaat": (210, 100, 50),
-    "Dikformaat": (210, 100, 65),
-    "Vechtformaat": (210, 100, 40),
+    "Dikformaat / waaldikformaat": (210, 100, 65),
+    "Brabantse steen": (180, 88, 53),
+    "Deens formaat": (228, 108, 54),
+    "Dordtse steen": (180, 88, 43),
+    "Dubbel waalformaat": (210, 100, 110),
+    "Dunnformat (DF)": (240, 115, 52),
+    "Engels formaat": (210, 102.5, 65),
+    "Euroformat": (188, 90, 88),
+    "F52": (230, 110, 57),
+    "Friese drieling": (184, 80, 40),
+    "Friese mop": (217, 103, 45),
+    "Goudse steen": (155, 72, 53),
+    "Groninger steen": (240, 120, 60),
     "Hilversums formaat": (240, 90, 40),
+    "IJsselformaat": (160, 78, 41),
+    "Juffertje": (175, 82, 40),
+    "Kathedraal I": (240, 115, 65),
+    "Kathedraal II": (270, 105, 55),
+    "Klampmuur-dikformaat": (100, 65, 210),
+    "Kloostermop I": (280, 105, 80),
+    "Kloostermop II": (320, 130, 80),
+    "Lilliput I": (160, 75, 35),
+    "Lilliput II": (150, 70, 30),
+    "Limburgse steen": (240, 120, 65),
+    "Moduul 190-140-90": (190, 140, 90),
+    "Moduul 190-90-40": (190, 90, 40),
     "Moduul 190-90-50": (190, 90, 50),
-    "Kloostermop I": (280, 105, 80)
+    "Moduul 190-90-90": (190, 90, 90),
+    "Moduul 240-90-90": (240, 90, 90),
+    "Moduul 290-115-190": (290, 115, 190),
+    "Moduul 290-115-90": (290, 115, 90),
+    "Moduul 290-90-190": (290, 90, 190),
+    "Moduul 290-90-90": (290, 90, 90),
+    "Normalformat (NF)": (240, 115, 71),
+    "Oldenburgerformat (OF)": (210, 105, 52),
+    "Reichsformat (RF)": (240, 115, 61),
+    "Rijnformaat": (180, 87, 41),
+    "Romeins formaat": (240, 115, 42),
+    "Utrechts plat": (215, 102, 38),
+    "Vechtformaat": (210, 100, 40),
+    "Verblender (2DF)": (240, 115, 113)
 }
 
-transformaties = ["Strippen (2-zijdig)", "Strippen (1-zijdig)", "Bakjes", "Zolen", "Hoeken"]
+# --- LOGO EN TITEL ---
+LOGO_URL = "https://raw.githubusercontent.com/DennisDeko/teken-tool/main/deko_logo.jpg"
+col_l, col_r = st.columns([1, 3])
+with col_l:
+    st.image(LOGO_URL, width=180)
+with col_r:
+    st.title("DEKO Maatwerk Editor Pro")
+
+st.divider()
 
 # --- SIDEBAR ---
-with st.sidebar:
-    st.header("1. Projectinformatie")
-    project_naam = st.text_input("Project", value="Nieuwbouw Elst")
-    sortering = st.text_input("Sortering", value="Rood genuanceerd")
-    stuks = st.number_input("Aantal stuks", value=100, step=1)
-
-    st.header("2. Basis Steen")
+with st.sidebar.expander("Snelkeuze Steenformaat", expanded=True):
     keuze_naam = st.selectbox("Kies standaard maat", list(steen_maten.keys()))
     std_l, std_b, std_h = steen_maten[keuze_naam]
-    base_L = int(st.number_input("Oorspronkelijke Lengte (A)", value=float(std_l)))
-    base_H = int(st.number_input("Oorspronkelijke Hoogte (B)", value=float(std_h)))
-    base_B = int(st.number_input("Oorspronkelijke Breedte/Diepte", value=float(std_b)))
 
-    st.header("3. Maten Eindproduct")
-    A = int(st.number_input("A: Lengte (mm)", value=base_L))
-    B = int(st.number_input("B: Hoogte (mm)", value=base_H))
-    C = int(st.number_input("C: Dikte strip (mm)", value=23))
+vorm_type = st.sidebar.selectbox("Type product", ["Steen", "Hoek"])
+zaag_dikte = st.sidebar.slider("Zaagblad dikte (mm)", 0.0, 5.0, 3.0)
 
-# --- 3D ENGINE ---
-def genereer_3d_vlakken(l, b, h, y_offset=0):
-    # h = B (hoogte), l = A (lengte), b = C (dikte)
-    vlakken = [
-        [[0, y_offset, 0], [l, y_offset, 0], [l, b+y_offset, 0], [0, b+y_offset, 0]], # onder
-        [[0, y_offset, h], [l, y_offset, h], [l, b+y_offset, h], [0, b+y_offset, h]], # boven
-        [[0, y_offset, 0], [l, y_offset, 0], [l, y_offset, h], [0, y_offset, h]],     # voor
-        [[l, y_offset, 0], [l, b+y_offset, 0], [l, b+y_offset, h], [l, y_offset, h]], # rechts
-        [[l, b+y_offset, 0], [0, b+y_offset, 0], [0, b+y_offset, h], [l, b+y_offset, h]], # achter
-        [[0, b+y_offset, 0], [0, y_offset, 0], [0, y_offset, h], [0, b+y_offset, h]]      # links
-    ]
-    return vlakken
+with st.sidebar.expander("Afmetingen Aanpassen", expanded=True):
+    l1 = st.number_input("Lengte L1 (mm)", value=float(std_l))
+    l2 = st.number_input("Breedte/Lengte L2 (mm)", value=float(std_b))
+    h = st.number_input("Hoogte H (mm)", value=float(std_h))
+    
+    if vorm_type == "Hoek":
+        dikte = st.number_input("Dikte D (mm)", value=23.0)
+        grond_poly = np.array([[0,0], [l1,0], [l1,dikte], [dikte,dikte], [dikte,l2], [0,l2]])
+        vlak_indices = [[0,1,2,3,4,5], [6,7,8,9,10,11], [0,1,7,6], [1,2,8,7], [2,3,9,8], [3,4,10,9], [4,5,11,10], [5,0,6,11]]
+    else:
+        dikte = 0.0
+        grond_poly = np.array([[0,0], [l1,0], [l1,l2], [0,l2]])
+        vlak_indices = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
+
+with st.sidebar.expander("Zaaglijnen (Rood)", expanded=True):
+    ax_count = st.slider("Aantal X-snedes", 0, 5, 0)
+    pos_x = [st.number_input(f"X{i+1}", value=23.0 if i==0 else l1-23, key=f"x{i}") for i in range(ax_count)]
+    ay_count = st.slider("Aantal Y-snedes", 0, 5, 0)
+    pos_y = [st.number_input(f"Y{i+1}", value=23.0 if i==0 else l2-23, key=f"y{i}") for i in range(ay_count)]
 
 # --- VISUALISATIE ---
 col1, col2 = st.columns(2)
@@ -58,48 +97,63 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("2D Zaagplan")
     fig1, ax1 = plt.subplots(figsize=(6, 5))
-    # Basissteen (Bovenaanzicht)
-    ax1.add_patch(plt.Rectangle((0,0), A, base_B, facecolor='gray', alpha=0.1, edgecolor='black', ls='--'))
-    # Strippen
-    ax1.add_patch(plt.Rectangle((0,0), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
-    ax1.add_patch(plt.Rectangle((0, base_B-C), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
     
-    # Labels 2D
-    ax1.text(A/2, -15, f"A: {A}", ha='center', fontweight='bold')
-    ax1.text(A+10, base_B/2, f"B: {B}", va='center', fontweight='bold', rotation=270)
-    ax1.annotate('', xy=(A*0.1, 0), xytext=(A*0.1, C), arrowprops=dict(arrowstyle='<->'))
-    ax1.text(A*0.12, C/2, f"C: {C}", va='center', fontweight='bold')
+    # Teken de steen/hoek
+    poly = plt.Polygon(grond_poly, facecolor='lightgray', alpha=0.3, edgecolor='black', linewidth=1.5)
+    ax1.add_patch(poly)
 
-    ax1.set_xlim(-50, A+80); ax1.set_ylim(-40, base_B+40); ax1.axis('off')
-    st.pyplot(fig1)
+    # Zaaglijnen X
+    for i, px in enumerate(pos_x):
+        y_m = l2 if (vorm_type=="Steen" or px<=dikte) else dikte
+        ax1.add_patch(plt.Rectangle((px, 0), zaag_dikte, y_m, facecolor='red', alpha=0.8))
+        # Slimme maatvoering
+        txt = f"X{i+1}: {int(px)}" if px <= l1/2 else f"X{i+1}: {int(px)} ({int(l1-px)} v.R)"
+        ax1.text(px, y_m + (l2*0.05), txt, color='red', weight='bold', fontsize=9, ha='center')
+
+    # Zaaglijnen Y
+    for i, py in enumerate(pos_y):
+        x_m = l1 if (vorm_type=="Steen" or py<=dikte) else dikte
+        ax1.add_patch(plt.Rectangle((0, py), x_m, zaag_dikte, facecolor='red', alpha=0.8))
+        # Slimme maatvoering
+        txt = f"Y{i+1}: {int(py)}" if py <= l2/2 else f"Y{i+1}: {int(py)} ({int(l2-py)} v.B)"
+        ax1.text(x_m + (l1*0.05), py, txt, color='red', weight='bold', fontsize=9, va='center')
+
+    # Dynamische assen (GEFIXT)
+    ax1.set_xlim(-20, l1 + 60)
+    ax1.set_ylim(-20, l2 + 60)
+    ax1.set_aspect('equal')
+    ax1.axis('off')
+    st.pyplot(fig1, dpi=80)
 
 with col2:
     st.subheader("3D Preview")
-    fig2 = plt.figure(figsize=(6, 5)); ax2 = fig2.add_subplot(111, projection='3d')
-    
-    # Strippen tekenen (B is hoogte)
-    ax2.add_collection3d(Poly3DCollection(genereer_3d_vlakken(A, C, B, 0), facecolors='cyan', alpha=0.7, edgecolors='blue'))
-    ax2.add_collection3d(Poly3DCollection(genereer_3d_vlakken(A, C, B, base_B-C), facecolors='cyan', alpha=0.7, edgecolors='blue'))
+    fig2 = plt.figure(); ax2 = fig2.add_subplot(111, projection='3d')
+    v_3d = np.array([ [p[0],p[1],0] for p in grond_poly ] + [ [p[0],p[1],h] for p in grond_poly ])
+    ax2.add_collection3d(Poly3DCollection([[v_3d[i] for i in idx] for idx in vlak_indices], facecolors='cyan', alpha=0.1, edgecolors='black'))
 
-    # MAAT A (Lengte) - Lager geplaatst
-    ax2.plot([0, A], [-20, -20], [0, 0], color='black')
-    ax2.text(A/2, -45, -10, f"A: {A}", ha='center', fontweight='bold')
+    for px in pos_x:
+        y_top = l2 if (vorm_type=="Steen" or px<=dikte) else dikte
+        vlak = [[px,0,0], [px+zaag_dikte,0,0], [px+zaag_dikte,y_top,h], [px,y_top,h]]
+        ax2.add_collection3d(Poly3DCollection([vlak], facecolors='red', alpha=0.6))
 
-    # MAAT B (Hoogte) - Verticale lijn
-    ax2.plot([A+15, A+15], [0, 0], [0, B], color='black', lw=2)
-    ax2.text(A+25, 0, B/2, f"B: {B}", fontweight='bold', va='center')
+    for py in pos_y:
+        x_top = l1 if (vorm_type=="Steen" or py<=dikte) else dikte
+        vlak = [[0,py,0], [x_top,py,0], [x_top,py+zaag_dikte,h], [0,py+zaag_dikte,h]]
+        ax2.add_collection3d(Poly3DCollection([vlak], facecolors='red', alpha=0.6))
 
-    # MAAT C (Dikte) - Op de kopse kant
-    ax2.plot([-15, -15], [0, C], [B/2, B/2], color='red', lw=2)
-    ax2.text(-60, 0, B/2 + 5, f"C: {C}", color='red', fontweight='bold')
-
-    ax2.set_xlim(0, A); ax2.set_ylim(0, base_B); ax2.set_zlim(0, B+20)
+    lim = max(l1,l2,h)
+    ax2.set_xlim(0, lim); ax2.set_ylim(0, lim); ax2.set_zlim(0, lim)
     ax2.view_init(elev=20, azim=-35); ax2.axis('off')
-    st.pyplot(fig2)
+    st.pyplot(fig2, dpi=80)
 
 # --- OVERZICHT ---
 st.divider()
-st.subheader("📄 Projectgegevens & Maten")
-c1, c2 = st.columns(2)
-c1.write(f"**Project:** {project_naam} | **Sortering:** {sortering} | **Aantal:** {stuks}")
-c2.table(pd.DataFrame([{"A (Lengte)": A, "B (Hoogte)": B, "C (Dikte)": C}]))
+st.subheader(f"📋 Werkbon: {keuze_naam}")
+overzicht = []
+for i, px in enumerate(pos_x):
+    overzicht.append({"Type": "X-Snede", "Nr": i+1, "Maat vanaf links": f"{px} mm", "Maat vanaf rechts": f"{l1-px} mm"})
+for i, py in enumerate(pos_y):
+    overzicht.append({"Type": "Y-Snede", "Nr": i+1, "Maat vanaf onder": f"{py} mm", "Maat vanaf boven": f"{l2-py} mm"})
+
+if overzicht:
+    st.table(pd.DataFrame(overzicht))

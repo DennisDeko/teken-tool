@@ -69,8 +69,32 @@ with col_logo1:
     except: st.empty()
 with col_logo2:
     st.title("DEKO Maatwerk Editor Pro")
+    st.caption("Professionele Tool voor Maatwerkstenen")
 
 st.divider()
+
+# --- HELPER FUNCTIE: PDF GENERATIE ---
+def generate_pdf(df, fig, naam, l, b, h):
+    buf = BytesIO()
+    p = canvas.Canvas(buf, pagesize=A4)
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, 800, f"WERKBON: {naam} ({l} x {b} x {h} mm)")
+    
+    # Sla figuur op
+    img_buf = BytesIO()
+    fig.savefig(img_buf, format='png', bbox_inches='tight', facecolor='white')
+    img_buf.seek(0)
+    p.drawImage(ImageReader(img_buf), 50, 500, width=400, preserveAspectRatio=True)
+    
+    p.setFont("Helvetica-Bold", 12); p.drawString(50, 480, "Zaagsnedes Details:")
+    y_pos = 460
+    p.setFont("Helvetica", 10)
+    for _, row in df.iterrows():
+        p.drawString(50, y_pos, f"{row['Type']} {row['Nr']}: {row['Maat vanaf Links']} | {row['Maat vanaf Rechts']}")
+        y_pos -= 15
+    
+    p.showPage(); p.save(); buf.seek(0)
+    return buf
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -87,9 +111,10 @@ with st.sidebar:
     zaag_dikte = st.number_input("Zaagdikte (mm)", 0.0, 10.0, 3.0, step=0.5)
 
     with st.expander("Afmetingen", expanded=True):
-        l1 = st.number_input("L1 (mm)", value=float(std_l))
-        l2 = st.number_input("L2 (mm)", value=float(std_b))
-        h = st.number_input("H (mm)", value=float(std_h))
+        col_dim1, col_dim2, col_dim3 = st.columns(3)
+        l1 = col_dim1.number_input("L1 (mm)", value=float(std_l))
+        l2 = col_dim2.number_input("L2 (mm)", value=float(std_b))
+        h = col_dim3.number_input("H (mm)", value=float(std_h))
         dikte = 0.0
         if vorm_type == "Hoek":
             dikte = st.number_input("Dikte D (mm)", value=min(23.0, l1/2, l2/2))
@@ -111,7 +136,7 @@ col_v1, col_v2 = st.columns(2)
 
 # --- 2D ZAAGPLAN ---
 with col_v1:
-    st.subheader("📐 2D Zaagplan")
+    st.subheader("📐 2D Zaagplan met Maten")
     fig1, ax1 = plt.subplots(figsize=(6, 5))
     fig1.patch.set_alpha(0) # Transparant voor Streamlit
     
@@ -120,33 +145,63 @@ with col_v1:
     for i in range(len(segs_x)-1):
         x_s, x_e = segs_x[i], segs_x[i+1]
         f_col = '#5bc0de' if i == 0 else '#d3d3d3' # Hoofddeel blauw, rest grijs
+        seg_w = x_e - x_s
         
         if vorm_type == "Steen":
-            ax1.add_patch(plt.Rectangle((x_s, 0), x_e-x_s, l2, facecolor=f_col, edgecolor='black', alpha=0.5))
+            ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, l2, facecolor=f_col, edgecolor='black', alpha=0.5))
+            # Segmentmaat binnenin
+            ax1.text(x_s + seg_w/2, l2/2, f"{int(seg_w)}", ha='center', va='center', color='black', weight='bold')
         else:
-            # Versimpelde hoek-segmentatie voor 2D
+            # Hoek-segmentatie in 2D
             if i == 0:
                 poly = MatplotlibPolygon(grond_poly, facecolor='#5bc0de', edgecolor='black', alpha=0.5)
                 ax1.add_patch(poly)
+                # Hoofddeelmaat L1-D
+                ax1.text(dikte + (l1-dikte)/2, dikte/2, f"{int(l1-dikte)}", ha='center', va='center', color='black', weight='bold')
             else:
                 y_h = dikte if x_s >= dikte else l2
-                ax1.add_patch(plt.Rectangle((x_s, 0), x_e-x_s, y_h, facecolor='#d3d3d3', edgecolor='black', alpha=0.5))
+                ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, y_h, facecolor='#d3d3d3', edgecolor='black', alpha=0.5))
+                # Segmentmaat reststuk
+                ax1.text(x_s + seg_w/2, y_h/2, f"{int(seg_w)}", ha='center', va='center', color='black', weight='bold')
 
     # Zaaglijnen
-    for px in sorted_x:
+    for i, px in enumerate(sorted_x):
         y_m = l2 if (vorm_type=="Steen" or px <= dikte) else dikte
         ax1.add_patch(plt.Rectangle((px - zaag_dikte/2, 0), zaag_dikte, y_m, color='red', zorder=10))
-    for py in sorted_y:
+        # Zaaglijnlabel X
+        ax1.text(px, y_m + 5, f"X{i+1}: {int(px)}", color='red', weight='bold', fontsize=8, ha='center')
+    
+    for i, py in enumerate(sorted_y):
         x_m = l1 if (vorm_type=="Steen" or py <= dikte) else dikte
         ax1.add_patch(plt.Rectangle((0, py - zaag_dikte/2), x_m, zaag_dikte, color='red', zorder=10))
+        # Zaaglijnlabel Y
+        ax1.text(x_m + 5, py, f"Y{i+1}: {int(py)}", color='red', weight='bold', fontsize=8, va='center')
 
-    ax1.set_xlim(-20, l1+20); ax1.set_ylim(-20, l2+20)
+    # Maatlijnen (Dimension Lines)
+    # L1 (Onder)
+    ax1.annotate('', xy=(0, -10), xytext=(l1, -10), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
+    ax1.text(l1/2, -18, f"L1: {int(l1)}", ha='center', fontsize=9, color='black', weight='bold')
+    
+    # L2 (Links)
+    ax1.annotate('', xy=(-10, 0), xytext=(-10, l2), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
+    ax1.text(-18, l2/2, f"L2: {int(l2)}", va='center', rotation=90, fontsize=9, color='black', weight='bold')
+    
+    # H (Optioneel, rechtsboven)
+    ax1.annotate('', xy=(l1+10, l2), xytext=(l1+10, l2+10), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
+    ax1.text(l1+15, l2+5, f"H: {int(h)}", va='center', fontsize=9, color='black', weight='bold')
+    
+    if vorm_type == "Hoek":
+        # Dikte D (Onder L1-D)
+        ax1.annotate('', xy=(0, -5), xytext=(dikte, -5), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
+        ax1.text(dikte/2, -13, f"D: {int(dikte)}", ha='center', fontsize=8, color='black', weight='bold')
+
+    ax1.set_xlim(-30, l1+30); ax1.set_ylim(-30, l2+30)
     ax1.set_aspect('equal'); ax1.axis('off')
     st.pyplot(fig1)
 
 # --- 3D PREVIEW ---
 with col_v2:
-    st.subheader("📦 3D Preview")
+    st.subheader("📦 3D Preview met Maten")
     fig3d = go.Figure()
 
     def add_cube(fig, x_r, y_r, z_r, color, name, op=0.9):
@@ -165,13 +220,14 @@ with col_v2:
         c = '#5bc0de' if i == 0 else '#f0ad4e'
         s_x = curr_x + (zaag_dikte/2 if curr_x > 0 else 0)
         e_x = next_x - (zaag_dikte/2 if next_x < l1 else 0)
+        seg_w = e_x - s_x
         
         if vorm_type == "Steen":
-            add_cube(fig3d, (s_x, e_x), (0, l2), (0, h), c, f"Segment {i+1}")
+            add_cube(fig3d, (s_x, e_x), (0, l2), (0, h), c, f"Seg {i+1}: {int(seg_w)}")
         else:
-            add_cube(fig3d, (s_x, e_x), (0, dikte), (0, h), c, f"Deel X {i+1}")
+            add_cube(fig3d, (s_x, e_x), (0, dikte), (0, h), c, f"Deel X {i+1}: {int(seg_w)}")
             if i == 0 and l2 > dikte:
-                add_cube(fig3d, (0, dikte), (dikte, l2), (0, h), c, "Deel Y")
+                add_cube(fig3d, (0, dikte), (dikte, l2), (0, h), c, f"Deel Y: {int(l2)}")
         curr_x = next_x
 
     # Zaagsnedes Rood
@@ -182,39 +238,22 @@ with col_v2:
         x_m = l1 if (vorm_type=="Steen" or py <= dikte) else dikte
         add_cube(fig3d, (0, x_m), (py-zaag_dikte/2, py+zaag_dikte/2), (0, h), 'red', "Zaag Y", 1.0)
 
-    fig3d.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0,r=0,b=0,t=0))
+    fig3d.update_layout(
+        scene=dict(
+            xaxis_title=f"L1: {int(l1)}",
+            yaxis_title=f"L2: {int(l2)}",
+            zaxis_title=f"H: {int(h)}",
+            aspectmode='data'
+        ),
+        margin=dict(l=0,r=0,b=0,t=0)
+    )
     st.plotly_chart(fig3d, use_container_width=True)
-
-# --- PDF GENERATOR FUNCTIE ---
-def generate_pdf(df, fig, naam, l, b, h):
-    buf = BytesIO()
-    p = canvas.Canvas(buf, pagesize=A4)
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, 800, f"WERKBON: {naam}")
-    p.setFont("Helvetica", 10)
-    p.drawString(50, 785, f"Formaat: {l} x {b} x {h} mm")
-    
-    # Sla figuur op zonder de foutieve parameter
-    img_buf = BytesIO()
-    fig.savefig(img_buf, format='png', bbox_inches='tight', facecolor='white')
-    img_buf.seek(0)
-    p.drawImage(ImageReader(img_buf), 50, 500, width=400, preserveAspectRatio=True)
-    
-    p.setFont("Helvetica-Bold", 12); p.drawString(50, 480, "Zaagsnedes:")
-    y_pos = 460
-    p.setFont("Helvetica", 10)
-    for _, row in df.iterrows():
-        p.drawString(50, y_pos, f"{row['Type']} {row['Nr']}: {row['Maat vanaf As 1']} | {row['Maat vanaf As 2']}")
-        y_pos -= 15
-    
-    p.showPage(); p.save(); buf.seek(0)
-    return buf
 
 # --- OVERZICHT ---
 st.divider()
 data = []
-for i, px in enumerate(pos_x): data.append({"Type": "X-Snede", "Nr": i+1, "Maat vanaf As 1": f"{px}mm (L)", "Maat vanaf As 2": f"{l1-px}mm (R)"})
-for i, py in enumerate(pos_y): data.append({"Type": "Y-Snede", "Nr": i+1, "Maat vanaf As 1": f"{py}mm (O)", "Maat vanaf As 2": f"{l2-py}mm (B)"})
+for i, px in enumerate(pos_x): data.append({"Type": "X-Snede", "Nr": i+1, "Maat vanaf Links": f"{px}mm", "Maat vanaf Rechts": f"{l1-px}mm", "Segment": "Hoofddeel" if px == min(pos_x) else f"Deel {i+1}"})
+for i, py in enumerate(pos_y): data.append({"Type": "Y-Snede", "Nr": i+1, "Maat vanaf Links": f"{py}mm", "Maat vanaf Rechts": f"{l2-py}mm", "Segment": "Y-Deel"})
 df_wb = pd.DataFrame(data)
 
 c1, c2 = st.columns([2, 1])

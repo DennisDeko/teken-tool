@@ -2,127 +2,102 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
-import pandas as pd
 
-st.set_page_config(page_title="DEKO Maatwerk Editor Pro", layout="wide")
+st.set_page_config(page_title="DEKO Productie Tool", layout="wide")
 
-# --- DATABASE STANDAARD MATEN ---
-steen_maten = {
-    "Waalformaat": (210, 100, 50),
-    "Dikformaat / waaldikformaat": (210, 100, 65),
-    "Vechtformaat": (210, 100, 40),
-    "Hilversums formaat": (240, 90, 40),
-    "Brabantse steen": (180, 88, 53),
-    "Deens formaat": (228, 108, 54),
-    "Dordtse steen": (180, 88, 43),
-    "Dubbel waalformaat": (210, 100, 110),
-    "Euroformat": (188, 90, 88),
-    "Groninger steen": (240, 120, 60),
-    "IJsselformaat": (160, 78, 41),
-    "Kloostermop I": (280, 105, 80),
-    "Lilliput I": (160, 75, 35),
-    "Vrij invoeren": (210, 100, 50)
-}
-
-# --- LOGO EN TITEL ---
-LOGO_URL = "https://raw.githubusercontent.com/DennisDeko/teken-tool/main/deko_logo.jpg"
-col_l, col_r = st.columns([1, 3])
-with col_l:
-    st.image(LOGO_URL, width=180)
-with col_r:
-    st.title("DEKO Maatwerk Editor Pro")
-
-st.divider()
+# --- DATABASE ---
+steen_maten = {"Vrij invoeren": (210, 100, 50), "Waalformaat": (210, 100, 50), "Dikformaat": (210, 100, 65)}
 
 # --- SIDEBAR ---
 with st.sidebar:
-    with st.expander("Snelkeuze Steenformaat", expanded=True):
-        keuze_naam = st.selectbox("Kies standaard maat", list(steen_maten.keys()))
-        std_l, std_b, std_h = steen_maten[keuze_naam]
-
-    st.header("Transformatie Instellingen")
-    transformatie = st.selectbox("Type", ["Strippen", "Koppen", "Afkorten"])
-    aantal_zijden = st.radio("Aantal zijden", ["Enkelzijdig", "Dubbelzijdig"])
+    st.header("1. Basis Steen")
+    keuze = st.selectbox("Formaat", list(steen_maten.keys()))
+    L, B, H = st.number_input("Lengte", value=float(steen_maten[keuze][0])), st.number_input("Breedte", value=float(steen_maten[keuze][1])), st.number_input("Hoogte", value=float(steen_maten[keuze][2]))
     
-    zaag_dikte = st.slider("Zaagblad dikte (mm)", 0.0, 5.0, 3.0)
-
-    with st.expander("Afmetingen Basissteen", expanded=True):
-        l1 = st.number_input("Lengte L1 (mm)", value=float(std_l))
-        l2 = st.number_input("Breedte L2 (mm)", value=float(std_b))
-        h = st.number_input("Hoogte H (mm)", value=float(std_h))
-
-    with st.expander("Bewerkingsmaten", expanded=True):
-        dikte_strip = st.number_input("Dikte van de strip (mm)", value=23.0, min_value=1.0)
-
-# --- LOGICA VOOR STRIPPEN EN KOPPEN ---
-product_vlakken_2d = [] # [(x, y, w, h)]
-zaaglijnen_2d = []
-
-if transformatie == "Strippen":
-    # Strip 1 (Onderzijde)
-    product_vlakken_2d.append((0, 0, l1, dikte_strip))
-    zaaglijnen_2d.append((0, dikte_strip, l1, zaag_dikte))
+    st.header("2. Transformatie")
+    type_trans = st.selectbox("Type", ["Strippen", "Koppen", "Sparren", "Afkorten", "Hoeken", "Bakjes (L-Vorm)", "Zool", "Lomkop", "Romkop"])
     
-    if aantal_zijden == "Dubbelzijdig":
-        # Strip 2 (Bovenzijde)
-        product_vlakken_2d.append((0, l2 - dikte_strip, l1, dikte_strip))
-        zaaglijnen_2d.append((0, l2 - dikte_strip - zaag_dikte, l1, zaag_dikte))
-
-elif transformatie == "Koppen":
-    # Kop 1 (Links)
-    product_vlakken_2d.append((0, 0, dikte_strip, l2))
-    zaaglijnen_2d.append((dikte_strip, 0, zaag_dikte, l2))
+    # Specifieke opties per type
+    optie = None
+    if type_trans in ["Strippen", "Koppen"]:
+        optie = st.radio("Aantal", ["1-zijdig", "2-zijdig"])
     
-    if aantal_zijden == "Dubbelzijdig":
-        # Kop 2 (Rechts)
-        product_vlakken_2d.append((l1 - dikte_strip, 0, dikte_strip, l2))
-        zaaglijnen_2d.append((l1 - dikte_strip - zaag_dikte, 0, zaag_dikte, l2))
+    dikte = st.number_input("Zaag/Strip dikte (mm)", value=23.0)
+    zaagblad = st.slider("Zaagblad (mm)", 0.0, 5.0, 3.0)
+
+# --- LOGICA ENGINE ---
+def get_geometry(type_t, L, B, H, d, opt, zb):
+    product_vlakken = []
+    zaaglijnen_2d = [] # [(x, y, breedte, hoogte)]
+    
+    if type_t == "Strippen":
+        # Strippen zaag je in de lengte (B-as)
+        zaaglijnen_2d.append((0, d, L, zb))
+        if opt == "2-zijdig":
+            zaaglijnen_2d.append((0, B - d - zb, L, zb))
+            
+    elif type_t == "Koppen":
+        # Koppen zaag je op de korte kant (L-as)
+        zaaglijnen_2d.append((d, 0, zb, B))
+        if opt == "2-zijdig":
+            zaaglijnen_2d.append((L - d - zb, 0, zb, B))
+            
+    elif type_t == "Sparren":
+        # Sparren is horizontaal (H-as), in 2D bovenaanzicht zie je dit als een vlak-bewerking
+        zaaglijnen_2d.append((0, 0, L, B)) # Hele vlak wordt geraakt
+        
+    elif type_t == "Zool":
+        # Zool zaagt in de dikte (H-as)
+        zaaglijnen_2d.append((0, 0, L, B))
+        
+    elif type_t == "Bakjes (L-Vorm)":
+        # L-vorm: Strip + Zool
+        profiel = [(0,0), (L,0), (L,d), (d,d), (d,B), (0,B)]
+        # 3D vertices maken voor L-vorm
+        z = [[p[0], p[1], 0] for p in profiel] + [[p[0], p[1], H] for p in profiel]
+        idx = [[0,1,2,3,4,5], [6,7,8,9,10,11], [0,1,7,6], [1,2,8,7], [2,3,9,8], [3,4,10,9], [4,5,11,10], [5,0,6,11]]
+        product_vlakken = [[z[i] for i in face] for face in idx]
+
+    return zaaglijnen_2d, product_vlakken
+
+zaag_2d, prod_3d = get_geometry(type_trans, L, B, H, dikte, optie, zaagblad)
 
 # --- VISUALISATIE ---
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("2D Zaagplan")
-    fig1, ax1 = plt.subplots(figsize=(6, 5))
-    # Basissteen (grijs restant)
-    ax1.add_patch(plt.Rectangle((0, 0), l1, l2, facecolor='lightgray', alpha=0.3, edgecolor='black', linestyle='--'))
+    st.subheader("2D Zaagplan (Bovenaanzicht)")
+    fig1, ax1 = plt.subplots()
+    ax1.add_patch(plt.Rectangle((0,0), L, B, color='lightgray', alpha=0.3, edgecolor='black'))
+    
+    for (x, y, w, h_z) in zaag_2d:
+        ax1.add_patch(plt.Rectangle((x, y), w, h_z, color='red', alpha=0.8))
+    
+    if type_trans == "Bakjes (L-Vorm)":
+        profiel = plt.Polygon([(0,0), (L,0), (L,dikte), (dikte,dikte), (dikte,B), (0,B)], color='cyan', alpha=0.5)
+        ax1.add_patch(profiel)
 
-    # De Blauwe Strippen/Koppen
-    for (x, y, w, hb) in product_vlakken_2d:
-        ax1.add_patch(plt.Rectangle((x, y), w, hb, facecolor='cyan', alpha=0.7, edgecolor='blue', label='Strip'))
-
-    # De Rode Zaaglijnen
-    for (zx, zy, zw, zh) in zaaglijnen_2d:
-        ax1.add_patch(plt.Rectangle((zx, zy), zw, zh, facecolor='red', alpha=0.8))
-
-    ax1.set_xlim(-10, l1 + 20); ax1.set_ylim(-10, l2 + 20)
-    ax1.set_aspect('equal'); ax1.axis('off')
-    st.pyplot(fig1, dpi=80)
+    ax1.set_xlim(-10, L+10); ax1.set_ylim(-10, B+10); ax1.set_aspect('equal')
+    st.pyplot(fig1)
 
 with col2:
     st.subheader("3D Preview")
     fig2 = plt.figure(); ax2 = fig2.add_subplot(111, projection='3d')
     
-    # Basis blok (spookvorm)
-    z = np.array([[0,0,0], [l1,0,0], [l1,l2,0], [0,l2,0], [0,0,h], [l1,0,h], [l1,l2,h], [0,l2,h]])
-    vlak_indices = [[0,1,2,3], [4,5,6,7], [0,1,5,4], [1,2,6,5], [2,3,7,6], [3,0,4,7]]
-    ax2.add_collection3d(Poly3DCollection([[z[i] for i in idx] for idx in vlak_indices], facecolors='gray', alpha=0.05, edgecolors='black'))
+    # Basis steen (Spook)
+    z = np.array([[0,0,0], [L,0,0], [L,B,0], [0,B,0], [0,0,H], [L,0,H], [L,B,H], [0,B,H]])
+    v = [[z[0],z[1],z[2],z[3]], [z[4],z[5],z[6],z[7]], [z[0],z[1],z[5],z[4]], [z[1],z[2],z[6],z[5]], [z[2],z[3],z[7],z[6]], [z[3],z[0],z[4],z[7]]]
+    ax2.add_collection3d(Poly3DCollection(v, facecolors='gray', alpha=0.05, edgecolors='black', linestyles=':'))
 
-    # Blauwe Strippen in 3D
-    for (x, y, w, hb) in product_vlakken_2d:
-        sz = np.array([[x,y,0], [x+w,y,0], [x+w,y+hb,0], [x,y+hb,0], [x,y,h], [x+w,y,h], [x+w,y+hb,h], [x,y+hb,h]])
-        s_vlakken = [[0,1,2,3], [4,5,6,7], [0,1,5,4], [1,2,6,5], [2,3,7,6], [3,0,4,7]]
-        ax2.add_collection3d(Poly3DCollection([[sz[i] for i in idx] for idx in s_vlakken], facecolors='cyan', alpha=0.6, edgecolors='blue'))
+    # Specifieke 3D objecten
+    if prod_3d:
+        ax2.add_collection3d(Poly3DCollection(prod_3d, facecolors='cyan', alpha=0.7, edgecolors='blue'))
+    
+    # Visualisatie van Sparren/Zool (horizontale zaagsnede)
+    if type_trans in ["Sparren", "Zool"]:
+        z_level = H - dikte if type_trans == "Zool" else H/2
+        v_zaag = [[0,0,z_level], [L,0,z_level], [L,B,z_level], [0,B,z_level]]
+        ax2.add_collection3d(Poly3DCollection([v_zaag], facecolors='red', alpha=0.5))
 
-    ax2.set_xlim(0, max(l1,l2,h)); ax2.set_ylim(0, max(l1,l2,h)); ax2.set_zlim(0, max(l1,l2,h))
-    ax2.view_init(elev=20, azim=-35); ax2.axis('off')
-    st.pyplot(fig2, dpi=80)
-
-# --- OVERZICHTSTABEL ---
-st.divider()
-st.subheader("📋 Productiedetails")
-df_data = {
-    "Onderdeel": ["Gekozen Steen", "Bewerking", "Strip Dikte", "Aantal Strippen"],
-    "Waarde": [keuze_naam, transformatie, f"{dikte_strip} mm", "2" if aantal_zijden == "Dubbelzijdig" else "1"]
-}
-st.table(pd.DataFrame(df_data))
+    ax2.set_xlim(0, L); ax2.set_ylim(0, B); ax2.set_zlim(0, H)
+    st.pyplot(fig2)

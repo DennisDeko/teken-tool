@@ -18,6 +18,8 @@ steen_maten = {
     "Kloostermop I": (280, 105, 80)
 }
 
+transformaties = ["Strippen (2-zijdig)", "Strippen (1-zijdig)", "Bakjes", "Zolen", "Hoeken"]
+
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("1. Projectinformatie")
@@ -39,13 +41,14 @@ with st.sidebar:
 
 # --- 3D ENGINE ---
 def genereer_3d_vlakken(l, b, h, y_offset=0):
+    # h = B (hoogte), l = A (lengte), b = C (dikte)
     vlakken = [
-        [[0, y_offset, 0], [l, y_offset, 0], [l, b+y_offset, 0], [0, b+y_offset, 0]], 
-        [[0, y_offset, h], [l, y_offset, h], [l, b+y_offset, h], [0, b+y_offset, h]], 
-        [[0, y_offset, 0], [l, y_offset, 0], [l, y_offset, h], [0, y_offset, h]],     
-        [[l, y_offset, 0], [l, b+y_offset, 0], [l, b+y_offset, h], [l, y_offset, h]], 
-        [[l, b+y_offset, 0], [0, b+y_offset, 0], [0, b+y_offset, h], [l, b+y_offset, h]], 
-        [[0, b+y_offset, 0], [0, y_offset, 0], [0, y_offset, h], [0, y_offset, h]]      
+        [[0, y_offset, 0], [l, y_offset, 0], [l, b+y_offset, 0], [0, b+y_offset, 0]], # onder
+        [[0, y_offset, h], [l, y_offset, h], [l, b+y_offset, h], [0, b+y_offset, h]], # boven
+        [[0, y_offset, 0], [l, y_offset, 0], [l, y_offset, h], [0, y_offset, h]],     # voor
+        [[l, y_offset, 0], [l, b+y_offset, 0], [l, b+y_offset, h], [l, y_offset, h]], # rechts
+        [[l, b+y_offset, 0], [0, b+y_offset, 0], [0, b+y_offset, h], [l, b+y_offset, h]], # achter
+        [[0, b+y_offset, 0], [0, y_offset, 0], [0, y_offset, h], [0, b+y_offset, h]]      # links
     ]
     return vlakken
 
@@ -55,56 +58,48 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("2D Zaagplan")
     fig1, ax1 = plt.subplots(figsize=(6, 5))
+    # Basissteen (Bovenaanzicht)
     ax1.add_patch(plt.Rectangle((0,0), A, base_B, facecolor='gray', alpha=0.1, edgecolor='black', ls='--'))
+    # Strippen
     ax1.add_patch(plt.Rectangle((0,0), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
     ax1.add_patch(plt.Rectangle((0, base_B-C), A, C, facecolor='cyan', alpha=0.6, edgecolor='blue'))
     
-    # A met dubbele pijl
-    ax1.annotate('', xy=(0, -10), xytext=(A, -10), arrowprops=dict(arrowstyle='<->', color='black'))
-    ax1.text(A/2, -25, f"A: {A}", ha='center', fontweight='bold')
-    
-    # B met dubbele pijl
-    ax1.annotate('', xy=(A+15, 0), xytext=(A+15, base_B), arrowprops=dict(arrowstyle='<->', color='black'))
-    ax1.text(A+30, base_B/2, f"B: {B}", va='center', fontweight='bold', rotation=270)
-    
-    # C met dubbele pijl
-    ax1.annotate('', xy=(A*0.1, 0), xytext=(A*0.1, C), arrowprops=dict(arrowstyle='<->', color='black'))
-    ax1.text(A*0.15, C/2, f"C: {C}", va='center', fontweight='bold')
+    # Labels 2D
+    ax1.text(A/2, -15, f"A: {A}", ha='center', fontweight='bold')
+    ax1.text(A+10, base_B/2, f"B: {B}", va='center', fontweight='bold', rotation=270)
+    ax1.annotate('', xy=(A*0.1, 0), xytext=(A*0.1, C), arrowprops=dict(arrowstyle='<->'))
+    ax1.text(A*0.12, C/2, f"C: {C}", va='center', fontweight='bold')
 
-    ax1.set_xlim(-40, A+60); ax1.set_ylim(-40, base_B+30); ax1.axis('off')
+    ax1.set_xlim(-50, A+80); ax1.set_ylim(-40, base_B+40); ax1.axis('off')
     st.pyplot(fig1)
 
 with col2:
     st.subheader("3D Preview")
     fig2 = plt.figure(figsize=(6, 5)); ax2 = fig2.add_subplot(111, projection='3d')
     
-    # Strippen tekenen
+    # Strippen tekenen (B is hoogte)
     ax2.add_collection3d(Poly3DCollection(genereer_3d_vlakken(A, C, B, 0), facecolors='cyan', alpha=0.7, edgecolors='blue'))
     ax2.add_collection3d(Poly3DCollection(genereer_3d_vlakken(A, C, B, base_B-C), facecolors='cyan', alpha=0.7, edgecolors='blue'))
 
-    # MAAT A - Dubbele pijl op de voorgrond
-    ax2.annotate('', xy=(0, -30), xytext=(A, -30), arrowprops=dict(arrowstyle='<->', color='black', lw=1.5), annotation_clip=False)
-    ax2.text(A/2, -50, 0, f"A: {A}", ha='center', fontweight='bold', zorder=10)
+    # MAAT A (Lengte) - Lager geplaatst
+    ax2.plot([0, A], [-20, -20], [0, 0], color='black')
+    ax2.text(A/2, -45, -10, f"A: {A}", ha='center', fontweight='bold')
 
-    # MAAT B - Verticale dubbele pijl op de voorgrond
-    ax2.plot([A+20, A+20], [-10, -10], [0, B], color='black', lw=1.5, marker='v', markevery=[0, -1])
-    ax2.text(A+35, -10, B/2, f"B: {B}", fontweight='bold', va='center', zorder=10)
+    # MAAT B (Hoogte) - Verticale lijn
+    ax2.plot([A+15, A+15], [0, 0], [0, B], color='black', lw=2)
+    ax2.text(A+25, 0, B/2, f"B: {B}", fontweight='bold', va='center')
 
-    # MAAT C - Rode dubbele pijl voor dikte op de voorgrond
-    ax2.plot([-15, -15], [0, C], [B/2, B/2], color='red', lw=2, marker='|', markevery=[0, -1])
-    ax2.text(-65, 0, B/2, f"C: {C}", color='red', fontweight='bold', zorder=10)
+    # MAAT C (Dikte) - Op de kopse kant
+    ax2.plot([-15, -15], [0, C], [B/2, B/2], color='red', lw=2)
+    ax2.text(-60, 0, B/2 + 5, f"C: {C}", color='red', fontweight='bold')
 
-    ax2.set_xlim(0, A); ax2.set_ylim(-40, base_B); ax2.set_zlim(0, B+20)
+    ax2.set_xlim(0, A); ax2.set_ylim(0, base_B); ax2.set_zlim(0, B+20)
     ax2.view_init(elev=20, azim=-35); ax2.axis('off')
     st.pyplot(fig2)
 
 # --- OVERZICHT ---
 st.divider()
-st.subheader("📋 Projectoverzicht")
+st.subheader("📄 Projectgegevens & Maten")
 c1, c2 = st.columns(2)
-with c1:
-    st.write(f"**Project:** {project_naam}")
-    st.write(f"**Sortering:** {sortering}")
-    st.write(f"**Aantal:** {stuks} stuks")
-with c2:
-    st.table(pd.DataFrame([{"Maat A (Lengte)": A, "Maat B (Hoogte)": B, "Maat C (Dikte)": C}]))
+c1.write(f"**Project:** {project_naam} | **Sortering:** {sortering} | **Aantal:** {stuks}")
+c2.table(pd.DataFrame([{"A (Lengte)": A, "B (Hoogte)": B, "C (Dikte)": C}]))

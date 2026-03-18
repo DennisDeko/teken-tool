@@ -69,7 +69,7 @@ with col_logo1:
     except: st.empty()
 with col_logo2:
     st.title("DEKO Maatwerk Editor Pro")
-    st.caption("Professionele Tool voor Maatwerkstenen")
+    st.caption("Solide 3D Visualisatie")
 
 st.divider()
 
@@ -148,70 +148,47 @@ with col_v1:
         seg_w = x_e - x_s
         
         if vorm_type == "Steen":
-            ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, l2, facecolor=f_col, edgecolor='black', alpha=0.5))
+            ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, l2, facecolor=f_col, edgecolor='black', alpha=1.0)) # Volledig solide in 2D
             # Segmentmaat binnenin
             ax1.text(x_s + seg_w/2, l2/2, f"{int(seg_w)}", ha='center', va='center', color='black', weight='bold')
         else:
             # Hoek-segmentatie in 2D
             if i == 0:
-                poly = MatplotlibPolygon(grond_poly, facecolor='#5bc0de', edgecolor='black', alpha=0.5)
+                poly = MatplotlibPolygon(grond_poly, facecolor='#5bc0de', edgecolor='black', alpha=1.0)
                 ax1.add_patch(poly)
                 # Hoofddeelmaat L1-D
                 ax1.text(dikte + (l1-dikte)/2, dikte/2, f"{int(l1-dikte)}", ha='center', va='center', color='black', weight='bold')
             else:
                 y_h = dikte if x_s >= dikte else l2
-                ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, y_h, facecolor='#d3d3d3', edgecolor='black', alpha=0.5))
+                ax1.add_patch(plt.Rectangle((x_s, 0), seg_w, y_h, facecolor='#d3d3d3', edgecolor='black', alpha=1.0))
                 # Segmentmaat reststuk
                 ax1.text(x_s + seg_w/2, y_h/2, f"{int(seg_w)}", ha='center', va='center', color='black', weight='bold')
 
     # Zaaglijnen
-    for i, px in enumerate(sorted_x):
+    for px in sorted_x:
         y_m = l2 if (vorm_type=="Steen" or px <= dikte) else dikte
         ax1.add_patch(plt.Rectangle((px - zaag_dikte/2, 0), zaag_dikte, y_m, color='red', zorder=10))
-        # Zaaglijnlabel X
-        ax1.text(px, y_m + 5, f"X{i+1}: {int(px)}", color='red', weight='bold', fontsize=8, ha='center')
-    
-    for i, py in enumerate(sorted_y):
+    for py in sorted_y:
         x_m = l1 if (vorm_type=="Steen" or py <= dikte) else dikte
         ax1.add_patch(plt.Rectangle((0, py - zaag_dikte/2), x_m, zaag_dikte, color='red', zorder=10))
-        # Zaaglijnlabel Y
-        ax1.text(x_m + 5, py, f"Y{i+1}: {int(py)}", color='red', weight='bold', fontsize=8, va='center')
 
-    # Maatlijnen (Dimension Lines)
-    # L1 (Onder)
-    ax1.annotate('', xy=(0, -10), xytext=(l1, -10), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
-    ax1.text(l1/2, -18, f"L1: {int(l1)}", ha='center', fontsize=9, color='black', weight='bold')
-    
-    # L2 (Links)
-    ax1.annotate('', xy=(-10, 0), xytext=(-10, l2), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
-    ax1.text(-18, l2/2, f"L2: {int(l2)}", va='center', rotation=90, fontsize=9, color='black', weight='bold')
-    
-    # H (Optioneel, rechtsboven)
-    ax1.annotate('', xy=(l1+10, l2), xytext=(l1+10, l2+10), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
-    ax1.text(l1+15, l2+5, f"H: {int(h)}", va='center', fontsize=9, color='black', weight='bold')
-    
-    if vorm_type == "Hoek":
-        # Dikte D (Onder L1-D)
-        ax1.annotate('', xy=(0, -5), xytext=(dikte, -5), arrowprops=dict(arrowstyle='<->', color='black', linewidth=1))
-        ax1.text(dikte/2, -13, f"D: {int(dikte)}", ha='center', fontsize=8, color='black', weight='bold')
-
-    ax1.set_xlim(-30, l1+30); ax1.set_ylim(-30, l2+30)
+    ax1.set_xlim(-20, l1+20); ax1.set_ylim(-20, l2+20)
     ax1.set_aspect('equal'); ax1.axis('off')
     st.pyplot(fig1)
 
 # --- 3D PREVIEW ---
 with col_v2:
-    st.subheader("📦 3D Preview met Maten")
+    st.subheader("📦 Solide 3D Preview")
     fig3d = go.Figure()
 
-    def add_cube(fig, x_r, y_r, z_r, color, name, op=0.9):
+    def add_cube(fig, x_r, y_r, z_r, color, name, flatshading=True):
         if x_r[1] <= x_r[0] or y_r[1] <= y_r[0]: return
         fig.add_trace(go.Mesh3d(
             x=[x_r[0], x_r[1], x_r[1], x_r[0], x_r[0], x_r[1], x_r[1], x_r[0]],
             y=[y_r[0], y_r[0], y_r[1], y_r[1], y_r[0], y_r[0], y_r[1], y_r[1]],
             z=[0, 0, 0, 0, h, h, h, h],
             i=[7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2], j=[3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3], k=[0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
-            color=color, opacity=op, flatshading=True, name=name
+            color=color, flatshading=flatshading, name=name, showscale=False # Opacity verwijderd voor solide
         ))
 
     # Segmentatie X
@@ -220,23 +197,22 @@ with col_v2:
         c = '#5bc0de' if i == 0 else '#f0ad4e'
         s_x = curr_x + (zaag_dikte/2 if curr_x > 0 else 0)
         e_x = next_x - (zaag_dikte/2 if next_x < l1 else 0)
-        seg_w = e_x - s_x
         
         if vorm_type == "Steen":
-            add_cube(fig3d, (s_x, e_x), (0, l2), (0, h), c, f"Seg {i+1}: {int(seg_w)}")
+            add_cube(fig3d, (s_x, e_x), (0, l2), (0, h), c, f"Seg {i+1}")
         else:
-            add_cube(fig3d, (s_x, e_x), (0, dikte), (0, h), c, f"Deel X {i+1}: {int(seg_w)}")
+            add_cube(fig3d, (s_x, e_x), (0, dikte), (0, h), c, f"Deel X {i+1}")
             if i == 0 and l2 > dikte:
-                add_cube(fig3d, (0, dikte), (dikte, l2), (0, h), c, f"Deel Y: {int(l2)}")
+                add_cube(fig3d, (0, dikte), (dikte, l2), (0, h), c, f"Deel Y")
         curr_x = next_x
 
     # Zaagsnedes Rood
     for px in sorted_x:
         y_m = l2 if (vorm_type=="Steen" or px <= dikte) else dikte
-        add_cube(fig3d, (px-zaag_dikte/2, px+zaag_dikte/2), (0, y_m), (0, h), 'red', "Zaag X", 1.0)
+        add_cube(fig3d, (px-zaag_dikte/2, px+zaag_dikte/2), (0, y_m), (0, h), 'red', "Zaag X", flatshading=True) # Ook zaagsnedes solide
     for py in sorted_y:
         x_m = l1 if (vorm_type=="Steen" or py <= dikte) else dikte
-        add_cube(fig3d, (0, x_m), (py-zaag_dikte/2, py+zaag_dikte/2), (0, h), 'red', "Zaag Y", 1.0)
+        add_cube(fig3d, (0, x_m), (py-zaag_dikte/2, py+zaag_dikte/2), (0, h), 'red', "Zaag Y", flatshading=True) # Ook zaagsnedes solide
 
     fig3d.update_layout(
         scene=dict(
@@ -252,8 +228,8 @@ with col_v2:
 # --- OVERZICHT ---
 st.divider()
 data = []
-for i, px in enumerate(pos_x): data.append({"Type": "X-Snede", "Nr": i+1, "Maat vanaf Links": f"{px}mm", "Maat vanaf Rechts": f"{l1-px}mm", "Segment": "Hoofddeel" if px == min(pos_x) else f"Deel {i+1}"})
-for i, py in enumerate(pos_y): data.append({"Type": "Y-Snede", "Nr": i+1, "Maat vanaf Links": f"{py}mm", "Maat vanaf Rechts": f"{l2-py}mm", "Segment": "Y-Deel"})
+for i, px in enumerate(pos_x): data.append({"Type": "X-Snede", "Nr": i+1, "Maat vanaf Links": f"{px}mm", "Maat vanaf Rechts": f"{l1-px}mm"})
+for i, py in enumerate(pos_y): data.append({"Type": "Y-Snede", "Nr": i+1, "Maat vanaf Links": f"{py}mm", "Maat vanaf Rechts": f"{l2-py}mm"})
 df_wb = pd.DataFrame(data)
 
 c1, c2 = st.columns([2, 1])

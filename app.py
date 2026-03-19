@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-# --- 1. CONFIGURATIE & MATEN ---
+# --- 1. CONFIGURATIE ---
 steen_maten = {
     "Vrij invoeren": (210, 100, 50),
     "Waalformaat": (210, 100, 50),
@@ -18,7 +18,7 @@ steen_maten = {
 
 st.set_page_config(page_title="DEKO Maatwerk Tool Pro", layout="wide")
 
-# --- 2. SIDEBAR (INPUT) ---
+# --- 2. SIDEBAR ---
 with st.sidebar:
     st.header("Project Info")
     ref = st.text_input("Referentie", "Project A")
@@ -28,28 +28,36 @@ with st.sidebar:
     keuze_naam = st.selectbox("Formaat", list(steen_maten.keys()))
     std_l, std_b, std_h = steen_maten[keuze_naam]
     vorm_type = st.radio("Type", ["Steen", "Hoek"], horizontal=True)
-    
-    spatiëring = st.slider("3D Segment afstand (mm)", 0, 20, 5)
+    spatiëring = st.slider("Exploded View Afstand (mm)", 0, 30, 10)
 
     with st.expander("Basismaten", expanded=True):
-        l1 = st.number_input("Lengte L1 (mm)", value=float(std_l))
-        l2 = st.number_input("Breedte L2 (mm)", value=float(std_b))
-        h = st.number_input("Hoogte H (mm)", value=float(std_h))
-        dikte_hoek = st.number_input("Dikte D (mm)", value=23.0) if vorm_type == "Hoek" else 0.0
+        l1 = st.number_input("Lengte L1 (X-as)", value=float(std_l))
+        l2 = st.number_input("Breedte L2 (Y-as)", value=float(std_b))
+        h = st.number_input("Hoogte H", value=float(std_h))
+        dikte = st.number_input("Dikte D", value=23.0) if vorm_type == "Hoek" else 0.0
 
-    with st.expander("Zaaglijnen", expanded=True):
-        ax_count = st.slider("Aantal snedes", 0, 5, value=1)
-        pos_x = []
-        for i in range(ax_count):
-            p = st.number_input(f"X{i+1} Positie (mm)", value=50.0 * (i+1), key=f"pos_{i}")
-            pos_x.append(p)
+    # Zaaglijnen X (Lengte)
+    with st.expander("Zaaglijnen X (Horizontaal)", expanded=True):
+        x_count = st.slider("Aantal X-snedes", 0, 5, 1)
+        pos_x = [st.number_input(f"X{i+1} Positie (mm)", value=50.0*(i+1), key=f"x{i}") for i in range(x_count)]
+    
+    # Zaaglijnen Y (Breedte) - NU ALTIJD BESCHIKBAAR
+    with st.expander("Zaaglijnen Y (Verticaal)", expanded=True):
+        y_count = st.slider("Aantal Y-snedes", 0, 5, 0)
+        pos_y = [st.number_input(f"Y{i+1} Positie (mm)", value=40.0*(i+1), key=f"y{i}") for i in range(y_count)]
 
 # --- 3. LOGICA ---
 sorted_x = sorted([px for px in pos_x if 0 < px < l1])
 segs_x = [0] + sorted_x + [l1]
-cols = ['#5bc0de', '#f0ad4e', '#5cb85c', '#d9534f', '#9b59b6']
 
-# --- 4. LAYOUT DEFINITIE (Cruciaal voor c1 en c2) ---
+# Voor Y snedes: bij hoek starten we vanaf de dikte D, bij steen vanaf 0
+y_start = dikte if vorm_type == "Hoek" else 0
+sorted_y = sorted([py for py in pos_y if y_start < py < l2])
+segs_y = [y_start] + sorted_y + [l2]
+
+cols = ['#5bc0de', '#f0ad4e', '#5cb85c', '#d9534f', '#9b59b6', '#34495e']
+
+# --- 4. LAYOUT ---
 c1, c2 = st.columns(2)
 
 # --- 5. 2D ZAAGPLAN ---
@@ -57,78 +65,82 @@ with c1:
     st.subheader("📐 2D Zaagplan")
     fig1, ax1 = plt.subplots(figsize=(6, 5))
     fig1.patch.set_alpha(0)
-    
+
+    # Teken X-segmenten
     for i in range(len(segs_x)-1):
-        x_s, x_e = segs_x[i], segs_x[i+1]
-        w = x_e - x_s
+        xs, xe, w = segs_x[i], segs_x[i+1], segs_x[i+1]-segs_x[i]
         c = cols[i % len(cols)]
-        
-        if vorm_type == "Steen":
-            ax1.add_patch(plt.Rectangle((x_s, 0), w, l2, facecolor=c, edgecolor='black', alpha=0.7))
-            ax1.text(x_s + w/2, l2/2, f"{int(w)}", ha='center', va='center', weight='bold')
-        else:
-            if i == 0:
-                p_pts = np.array([[0,0], [x_e,0], [x_e,dikte_hoek], [dikte_hoek,dikte_hoek], [dikte_hoek,l2], [0,l2]])
-                ax1.add_patch(MatplotlibPolygon(p_pts, facecolor=c, edgecolor='black', alpha=0.7))
-                ax1.text(dikte_hoek/2, l2/2, f"{int(w)}", ha='center', va='center', weight='bold')
-            else:
-                y_h = dikte_hoek if x_s >= dikte_hoek else l2
-                ax1.add_patch(plt.Rectangle((x_s, 0), w, y_h, facecolor=c, edgecolor='black', alpha=0.7))
-                ax1.text(x_s + w/2, y_h/2, f"{int(w)}", ha='center', va='center', weight='bold')
+        h_box = l2 if (vorm_type=="Hoek" and i==0) else (dikte if vorm_type=="Hoek" else l2)
+        ax1.add_patch(plt.Rectangle((xs, 0), w, h_box, facecolor=c, edgecolor='black', alpha=0.6))
+        ax1.text(xs+w/2, h_box/2, f"{int(w)}", ha='center', va='center', weight='bold')
 
-    for i, px in enumerate(sorted_x):
-        y_max = l2 if (vorm_type=="Steen" or px <= dikte_hoek) else dikte_hoek
-        ax1.plot([px, px], [0, y_max], color='red', linestyle='--', linewidth=2)
+    # Teken Y-segmenten
+    for j in range(len(segs_y)-1):
+        ys, ye, h_seg = segs_y[j], segs_y[j+1], segs_y[j+1]-segs_y[j]
+        c = cols[(len(segs_x) + j) % len(cols)]
+        # Alleen tekenen als het een extra segment is bovenop de basis
+        if vorm_type == "Hoek":
+            ax1.add_patch(plt.Rectangle((0, ys), dikte, h_seg, facecolor=c, edgecolor='black', alpha=0.6))
+            ax1.text(dikte/2, ys+h_seg/2, f"{int(h_seg)}", ha='center', va='center', rotation=90)
+        elif y_count > 0: # Bij gewone steen snijden we de breedte
+             ax1.add_patch(plt.Rectangle((0, ys), l1 if x_count==0 else segs_x[1], h_seg, facecolor=c, edgecolor='black', alpha=0.4))
 
-    ax1.set_aspect('equal')
-    ax1.axis('off')
+    # Rode stippellijnen voor zaagsnedes
+    for px in sorted_x: 
+        y_lim = l2 if (vorm_type=="Hoek" and px <= dikte) else (dikte if vorm_type=="Hoek" else l2)
+        ax1.plot([px, px], [0, y_lim], "r--", lw=1.5)
+    for py in sorted_y: 
+        x_lim = dikte if vorm_type=="Hoek" else l1
+        ax1.plot([0, x_lim], [py, py], "r--", lw=1.5)
+
+    ax1.set_aspect('equal'); ax1.axis('off')
     st.pyplot(fig1)
 
-# --- 6. 3D EXPLODED VIEW ---
+# --- 6. 3D VIEW ---
 with c2:
     st.subheader("📦 3D Exploded View")
     fig3d = go.Figure()
 
-    def add_box(fig, x_range, y_range, z_range, color, name, offset_x):
-        x0, x1 = x_range[0] + offset_x, x_range[1] + offset_x
+    def add_mesh(fig, x_r, y_r, z_r, color, off_x=0, off_y=0):
+        x0, x1 = x_r[0]+off_x, x_r[1]+off_x
+        y0, y1 = y_r[0]+off_y, y_r[1]+off_y
         fig.add_trace(go.Mesh3d(
             x=[x0, x1, x1, x0, x0, x1, x1, x0],
-            y=[y_range[0], y_range[0], y_range[1], y_range[1], y_range[0], y_range[0], y_range[1], y_range[1]],
+            y=[y0, y0, y1, y1, y0, y0, y1, y1],
             z=[0, 0, 0, 0, h, h, h, h],
-            i=[7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2], 
-            j=[3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3], 
-            k=[0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
-            color=color, flatshading=True, name=name, showscale=False, opacity=0.9
+            i=[7,0,0,0,4,4,6,6,4,0,3,2], j=[3,4,1,2,5,6,5,2,0,1,6,3], k=[0,7,2,3,6,7,1,1,5,5,7,6],
+            color=color, flatshading=True, showscale=False, opacity=0.9
         ))
 
+    # X-segmenten tekenen
     for i in range(len(segs_x)-1):
-        xs, xe = segs_x[i], segs_x[i+1]
-        current_offset = i * spatiëring 
-        c = cols[i % len(cols)]
-        
-        if vorm_type == "Steen":
-            add_box(fig3d, (xs, xe), (0, l2), (0, h), c, f"Deel {i+1}", current_offset)
-        else:
-            add_box(fig3d, (xs, xe), (0, dikte_hoek), (0, h), c, f"Deel {i+1}", current_offset)
-            if i == 0: 
-                add_box(fig3d, (0, dikte_hoek), (dikte_hoek, l2), (0, h), c, "Poot", current_offset)
+        h_y = l2 if (vorm_type=="Hoek" and i==0) else (dikte if vorm_type=="Hoek" else l2)
+        add_mesh(fig3d, (segs_x[i], segs_x[i+1]), (0, h_y), (0, h), cols[i%6], off_x=i*spatiëring)
+
+    # Y-segmenten tekenen (bij hoek is dit de verticale poot, bij steen de breedte-snede)
+    if y_count > 0:
+        for j in range(len(segs_y)-1):
+            x_w = dikte if vorm_type == "Hoek" else l1
+            # Voorkom dubbel tekenen van het eerste blok
+            if segs_y[j] >= y_start:
+                add_mesh(fig3d, (0, x_w), (segs_y[j], segs_y[j+1]), (0, h), cols[(j+3)%6], off_y=j*spatiëring)
 
     fig3d.update_layout(
-        scene=dict(
-            aspectmode='data',
-            xaxis_visible=False, yaxis_visible=False, zaxis_visible=False,
-            camera=dict(eye=dict(x=1.8, y=1.8, z=1.2)),
-            dragmode=False # Voorkomt draaien met muis
-        ),
-        margin=dict(l=0, r=0, b=0, t=0),
-        showlegend=False
+        scene=dict(aspectmode='data', xaxis_visible=False, yaxis_visible=False, zaxis_visible=False,
+                   camera=dict(eye=dict(x=1.8, y=1.8, z=1.2)), dragmode=False),
+        margin=dict(l=0, r=0, b=0, t=0), showlegend=False
     )
-
-    # config zorgt voor geen toolbar en geen extra zware interactie
-    st.plotly_chart(fig3d, use_container_width=True, config={'displayModeBar': False, 'staticPlot': False})
+    st.plotly_chart(fig3d, use_container_width=True, config={'displayModeBar': False})
 
 # --- 7. TABEL ---
 st.divider()
-st.write(f"**Referentie:** {ref} | **Totaal:** {aantal} stuks")
-if sorted_x:
-    st.table(pd.DataFrame([{"Snede": f"X{i+1}", "Afstand": f"{px} mm"} for i, px in enumerate(sorted_x)]))
+t1, t2 = st.columns(2)
+with t1:
+    st.write(f"**Referentie:** {ref} | **Aantal:** {aantal}")
+    st.write("**X-Snedes (Lengte)**")
+    st.table(pd.DataFrame([{"Label": f"X{i+1}", "Afstand": f"{p} mm"} for i, p in enumerate(sorted_x)]) if sorted_x else "Geen")
+with t2:
+    st.write("**Basismaten**")
+    st.write(f"L1: {l1} | L2: {l2} | H: {h}" + (f" | Dikte: {dikte}" if vorm_type=="Hoek" else ""))
+    st.write("**Y-Snedes (Breedte/Poot)**")
+    st.table(pd.DataFrame([{"Label": f"Y{i+1}", "Afstand": f"{p} mm"} for i, p in enumerate(sorted_y)]) if sorted_y else "Geen")
